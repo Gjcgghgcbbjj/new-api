@@ -403,25 +403,73 @@ function renderCompactDetailSummary(summarySegments) {
       }}
     >
       {segments.map((segment, index) => (
-        <Typography.Text
+        <Tooltip
           key={`${segment.text}-${index}`}
-          type={segment.tone === 'secondary' ? 'tertiary' : undefined}
-          size={segment.tone === 'secondary' ? 'small' : undefined}
-          style={{
-            display: 'block',
-            maxWidth: '100%',
-            fontSize: 12,
-            marginTop: index === 0 ? 0 : 2,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
+          content={segment.tooltip || segment.text}
+          disabled={!segment.tooltip && String(segment.text).length < 20}
         >
-          {segment.text}
-        </Typography.Text>
+          <Typography.Text
+            type={segment.tone === 'secondary' ? 'tertiary' : undefined}
+            size={segment.tone === 'secondary' ? 'small' : undefined}
+            style={{
+              display: 'block',
+              maxWidth: '100%',
+              fontSize: 12,
+              marginTop: index === 0 ? 0 : 2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {segment.text}
+          </Typography.Text>
+        </Tooltip>
       ))}
     </div>
   );
+}
+
+function getRequestProtocolSegment(other, t) {
+  if (!other) {
+    return null;
+  }
+
+  const requestPath = other.request_path || '';
+  const upstreamPath = other.upstream_request_path || '';
+  const chain = Array.isArray(other.request_conversion)
+    ? other.request_conversion.filter(Boolean)
+    : [];
+
+  if (!requestPath && !upstreamPath && chain.length <= 1) {
+    return null;
+  }
+
+  const visibleParts = [];
+  if (requestPath) {
+    visibleParts.push(requestPath);
+  }
+  if (upstreamPath && upstreamPath !== requestPath) {
+    visibleParts.push(upstreamPath);
+  }
+
+  const chainText = chain.length > 1 ? chain.join(' -> ') : '';
+  const pathText = visibleParts.length > 0 ? visibleParts.join(' -> ') : chainText;
+  const tooltipParts = [];
+  if (requestPath) {
+    tooltipParts.push(`${t('请求路径')}：${requestPath}`);
+  }
+  if (upstreamPath) {
+    tooltipParts.push(`${t('上游请求路径')}：${upstreamPath}`);
+  }
+  if (chainText) {
+    tooltipParts.push(`${t('请求转换')}：${chainText}`);
+  }
+
+  return {
+    text: `${t('接口')}：${pathText}`,
+    tooltip: tooltipParts.join('\n'),
+    tone: 'secondary',
+  };
 }
 
 function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
@@ -437,6 +485,8 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
     return null;
   }
 
+  const protocolSegment = getRequestProtocolSegment(other, t);
+
   if (
     other?.violation_fee === true ||
     Boolean(other?.violation_fee_code) ||
@@ -448,29 +498,32 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
       other?.user_group_ratio,
       t,
     );
+    const segments = [
+      groupText ? { text: groupText, tone: 'primary' } : null,
+      { text: t('违规扣费'), tone: 'primary' },
+      {
+        text: `${t('扣费')}：${renderQuota(feeQuota, 6)}`,
+        tone: 'secondary',
+      },
+      text ? { text: `${t('详情')}：${text}`, tone: 'secondary' } : null,
+    ].filter(Boolean);
+
     return {
-      segments: [
-        groupText ? { text: groupText, tone: 'primary' } : null,
-        { text: t('违规扣费'), tone: 'primary' },
-        {
-          text: `${t('扣费')}：${renderQuota(feeQuota, 6)}`,
-          tone: 'secondary',
-        },
-        text ? { text: `${t('详情')}：${text}`, tone: 'secondary' } : null,
-      ].filter(Boolean),
+      segments: protocolSegment ? [...segments, protocolSegment] : segments,
     };
   }
 
   const summaryOpts = { ...other, displayMode: billingDisplayMode, outputMode: 'segments' };
 
-  if (other?.billing_mode === 'tiered_expr') {
-    return { segments: renderTieredModelPriceSimple(summaryOpts) };
-  }
+  const segments =
+    other?.billing_mode === 'tiered_expr'
+      ? renderTieredModelPriceSimple(summaryOpts)
+      : other?.claude
+        ? renderModelPriceSimple({ ...summaryOpts, provider: 'claude' })
+        : renderModelPriceSimple({ ...summaryOpts, provider: 'openai' });
 
   return {
-    segments: other?.claude
-      ? renderModelPriceSimple({ ...summaryOpts, provider: 'claude' })
-      : renderModelPriceSimple({ ...summaryOpts, provider: 'openai' }),
+    segments: protocolSegment ? [...segments, protocolSegment] : segments,
   };
 }
 

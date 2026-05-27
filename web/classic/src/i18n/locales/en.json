@@ -3061,6 +3061,7 @@
     "请求次数": "Number of Requests",
     "请求结束后多退少补": "Adjust after request completion",
     "请求超时，请刷新页面后重新发起 GitHub 登录": "Request timed out, please refresh and restart GitHub login",
+    "接口": "Interface",
     "请求路径": "Request path",
     "上游请求路径": "Upstream request path",
     "请求转换": "Request conversion",
