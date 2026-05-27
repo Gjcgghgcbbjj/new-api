@@ -533,6 +533,31 @@ export const useLogsData = () => {
           value: other.request_path,
         });
       }
+      if (
+        logs[i].type === 2 &&
+        (other?.request_path ||
+          other?.upstream_request_path ||
+          Array.isArray(other?.request_conversion))
+      ) {
+        const requestPath = other?.request_path || '-';
+        const upstreamPath = other?.upstream_request_path || requestPath;
+        const conversionText = requestConversionDisplayValue(
+          other?.request_conversion,
+        );
+        const processLines = [
+          `${t('入口接口')}：${requestPath}`,
+          `${t('上游接口')}：${upstreamPath}`,
+          `${t('转换过程')}：${conversionText}`,
+        ];
+        expandDataLocal.push({
+          key: t('接口过程'),
+          value: (
+            <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+              {processLines.join('\n')}
+            </div>
+          ),
+        });
+      }
       if (other?.upstream_request_path) {
         expandDataLocal.push({
           key: t('上游请求路径'),
