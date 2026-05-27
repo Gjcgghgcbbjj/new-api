@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { CircleAlert, Sparkles, KeyRound } from 'lucide-react'
+import { CircleAlert, Sparkles, KeyRound, Route } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
@@ -63,6 +63,8 @@ interface DetailSegment {
   text: string
   muted?: boolean
   danger?: boolean
+  protocol?: boolean
+  tooltip?: string
 }
 
 function formatRatioCompact(ratio: number | undefined): string {
@@ -88,6 +90,46 @@ function getGroupRatioText(other: LogOtherData | null): string | null {
   }
 
   return null
+}
+
+function getRequestProtocolSegment(
+  other: LogOtherData | null,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): DetailSegment | null {
+  if (!other) return null
+
+  const requestPath = other.request_path || ''
+  const upstreamPath = other.upstream_request_path || ''
+  const conversionChain = Array.isArray(other.request_conversion)
+    ? other.request_conversion.filter(Boolean)
+    : []
+
+  if (!requestPath && !upstreamPath && conversionChain.length <= 1) {
+    return null
+  }
+
+  const visibleParts: string[] = []
+  if (requestPath) visibleParts.push(requestPath)
+  if (upstreamPath && upstreamPath !== requestPath) {
+    visibleParts.push(upstreamPath)
+  }
+
+  const conversionText =
+    conversionChain.length > 1 ? conversionChain.join(' -> ') : ''
+  const pathText =
+    visibleParts.length > 0 ? visibleParts.join(' -> ') : conversionText
+  const tooltipParts = [
+    requestPath ? `${t('Path')}: ${requestPath}` : null,
+    upstreamPath ? `${t('Upstream Path')}: ${upstreamPath}` : null,
+    conversionText ? `${t('Request conversion')}: ${conversionText}` : null,
+  ].filter(Boolean)
+
+  return {
+    text: `${t('Interface')}: ${pathText}`,
+    muted: true,
+    protocol: true,
+    tooltip: tooltipParts.join('\n'),
+  }
 }
 
 function splitQuotaDisplay(value: string): { prefix: string; amount: string } {
@@ -121,6 +163,8 @@ function buildDetailSegments(
       text: `${t('Fee')}: ${formatLogQuota(other?.fee_quota ?? log.quota)}`,
       muted: true,
     })
+    const protocolSegment = getRequestProtocolSegment(other, t)
+    if (protocolSegment) segments.push(protocolSegment)
     return segments
   }
 
@@ -256,6 +300,9 @@ function buildDetailSegments(
       danger: true,
     })
   }
+
+  const protocolSegment = getRequestProtocolSegment(other, t)
+  if (protocolSegment) segments.push(protocolSegment)
 
   return segments
 }
@@ -773,14 +820,19 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         const other = parseLogOther(log.other)
 
         const segments = buildDetailSegments(log, other, t)
-        const primary = segments[0]
-        const hasMore = segments.length > 1
+        const protocolSegment = segments.find((segment) => segment.protocol)
+        const billingSegments = segments.filter((segment) => !segment.protocol)
+        const primary = billingSegments[0] || protocolSegment
+        const displayedCount =
+          (primary ? 1 : 0) +
+          (protocolSegment && protocolSegment !== primary ? 1 : 0)
+        const remainingCount = Math.max(segments.length - displayedCount, 0)
 
         return (
           <>
             <button
               type='button'
-              className='group flex max-w-[200px] items-center gap-1 text-left text-xs'
+              className='group flex max-w-[240px] flex-col gap-0.5 text-left text-xs'
               onClick={() => setDialogOpen(true)}
               title={t('Click to view full details')}
             >
@@ -796,9 +848,9 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
                   )}
                 >
                   {primary.text}
-                  {hasMore && (
+                  {remainingCount > 0 && (
                     <span className='text-muted-foreground/40 ml-0.5'>
-                      +{segments.length - 1}
+                      +{remainingCount}
                     </span>
                   )}
                 </span>
@@ -808,6 +860,25 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
                 </span>
               ) : (
                 <span className='text-muted-foreground/40'>—</span>
+              )}
+              {protocolSegment && protocolSegment !== primary && (
+                <TooltipProvider delay={300}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className='text-muted-foreground flex max-w-full items-center gap-1 truncate leading-snug group-hover:underline' />
+                      }
+                    >
+                      <Route className='size-3 shrink-0' aria-hidden='true' />
+                      <span className='truncate'>{protocolSegment.text}</span>
+                    </TooltipTrigger>
+                    {protocolSegment.tooltip && (
+                      <TooltipContent className='max-w-xs whitespace-pre-line break-all'>
+                        {protocolSegment.tooltip}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </button>
             <DetailsDialog
@@ -820,8 +891,8 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         )
       },
       meta: { label: t('Details') },
-      size: 180,
-      maxSize: 200,
+      size: 220,
+      maxSize: 260,
     }
   )
 
