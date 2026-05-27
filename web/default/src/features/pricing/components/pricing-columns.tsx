@@ -69,6 +69,38 @@ function renderLimitedTags(
   )
 }
 
+const ENDPOINT_LABELS: Record<string, string> = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  'openai-response-via-chat': 'Response via Chat',
+  'openai-response-compact': 'Response Compact',
+}
+
+function formatEndpointLabel(endpoint: string): string {
+  return ENDPOINT_LABELS[endpoint] || endpoint
+}
+
+function renderLimitedEndpointTags(
+  items: string[],
+  maxDisplay: number = 3
+): React.ReactNode {
+  return (
+    <StatusBadgeList
+      items={items}
+      max={maxDisplay}
+      getKey={(item) => item}
+      renderItem={(item) => (
+        <StatusBadge
+          label={formatEndpointLabel(item)}
+          autoColor={item}
+          size='sm'
+          copyable={false}
+        />
+      )}
+    />
+  )
+}
+
 function renderLimitedGroupBadges(
   groups: string[],
   maxDisplay: number = 2
@@ -416,11 +448,13 @@ export function usePricingColumns(
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger render={<div />}>
-                {renderLimitedTags(endpoints, 2)}
+                {renderLimitedEndpointTags(endpoints, 2)}
               </TooltipTrigger>
               {endpoints.length > 2 && (
                 <TooltipContent side='top' className='max-w-[280px] p-2'>
-                  <span className='text-xs'>{endpoints.join(', ')}</span>
+                  <span className='text-xs'>
+                    {endpoints.map(formatEndpointLabel).join(', ')}
+                  </span>
                 </TooltipContent>
               )}
             </Tooltip>

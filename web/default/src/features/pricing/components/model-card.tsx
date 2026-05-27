@@ -34,6 +34,17 @@ import { formatPrice, formatRequestPrice } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
 
+const ENDPOINT_LABELS: Record<string, string> = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  'openai-response-via-chat': 'Response via Chat',
+  'openai-response-compact': 'Response Compact',
+}
+
+function formatEndpointLabel(endpoint: string): string {
+  return ENDPOINT_LABELS[endpoint] || endpoint
+}
+
 export interface ModelCardProps {
   model: PricingModel
   onClick: () => void
@@ -75,7 +86,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     : null
 
   const primaryGroup = groups[0]
-  const bottomTags = [...endpoints.slice(0, 2), ...tags.slice(0, 2)]
+  const bottomTags = [
+    ...endpoints.slice(0, 2).map(formatEndpointLabel),
+    ...tags.slice(0, 2),
+  ]
   const hiddenCount =
     Math.max(groups.length - 1, 0) +
     Math.max(endpoints.length - 2, 0) +

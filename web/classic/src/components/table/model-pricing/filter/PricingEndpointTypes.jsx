@@ -20,6 +20,13 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import SelectableButtonGroup from '../../../common/ui/SelectableButtonGroup';
 
+const endpointLabels = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  'openai-response-via-chat': 'Response via Chat',
+  'openai-response-compact': 'Response Compact',
+};
+
 /**
  * 端点类型筛选组件
  * @param {string|'all'} filterEndpointType 当前值
@@ -66,7 +73,7 @@ const PricingEndpointTypes = ({
 
   // 端点类型显示名称映射
   const getEndpointTypeLabel = (endpointType) => {
-    return endpointType;
+    return endpointLabels[endpointType] || endpointType;
   };
 
   const availableEndpointTypes = getAllEndpointTypes();

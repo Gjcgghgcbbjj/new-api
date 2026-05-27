@@ -86,6 +86,13 @@ const renderTags = (text) => {
   });
 };
 
+const endpointLabels = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  'openai-response-via-chat': 'Response via Chat',
+  'openai-response-compact': 'Response Compact',
+};
+
 function renderSupportedEndpoints(endpoints) {
   if (!endpoints || endpoints.length === 0) {
     return null;
@@ -94,7 +101,7 @@ function renderSupportedEndpoints(endpoints) {
     <Space wrap>
       {endpoints.map((endpoint, idx) => (
         <Tag key={endpoint} color={stringToColor(endpoint)} shape='circle'>
-          {endpoint}
+          {endpointLabels[endpoint] || endpoint}
         </Tag>
       ))}
     </Space>

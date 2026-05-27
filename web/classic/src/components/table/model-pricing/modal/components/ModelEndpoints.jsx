@@ -23,6 +23,13 @@ import { IconLink } from '@douyinfe/semi-icons';
 
 const { Text } = Typography;
 
+const endpointLabels = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  'openai-response-via-chat': 'Response via Chat',
+  'openai-response-compact': 'Response Compact',
+};
+
 const ModelEndpoints = ({ modelData, endpointMap = {}, t }) => {
   const renderAPIEndpoints = () => {
     if (!modelData) return null;
@@ -47,7 +54,7 @@ const ModelEndpoints = ({ modelData, endpointMap = {}, t }) => {
         >
           <span className='flex items-center pr-5'>
             <Badge dot type='success' className='mr-2' />
-            {type}
+            {endpointLabels[type] || type}
             {path && '：'}
             {path && (
               <span className='text-gray-500 md:ml-1 break-all'>{path}</span>

@@ -19,6 +19,7 @@ type EndpointInfo struct {
 var defaultEndpointInfoMap = map[constant.EndpointType]EndpointInfo{
 	constant.EndpointTypeOpenAI:                {Path: "/v1/chat/completions", Method: "POST"},
 	constant.EndpointTypeOpenAIResponse:        {Path: "/v1/responses", Method: "POST"},
+	constant.EndpointTypeOpenAIResponseViaChat: {Path: "/v1/responses", Method: "POST"},
 	constant.EndpointTypeOpenAIResponseCompact: {Path: "/v1/responses/compact", Method: "POST"},
 	constant.EndpointTypeAnthropic:             {Path: "/v1/messages", Method: "POST"},
 	constant.EndpointTypeGemini:                {Path: "/v1beta/models/{model}:generateContent", Method: "POST"},

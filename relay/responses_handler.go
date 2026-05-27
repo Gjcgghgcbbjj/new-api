@@ -70,6 +70,26 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 		return types.NewError(fmt.Errorf("invalid api type: %d", info.ApiType), types.ErrorCodeInvalidApiType, types.ErrOptionWithSkipRetry())
 	}
 	adaptor.Init(info)
+
+	if shouldResponsesUseChatCompletionsBridge(info, request) {
+		usage, newAPIError := responsesViaChatCompletions(c, info, adaptor, request)
+		statusCodeMappingStr := c.GetString("status_code_mapping")
+		if newAPIError != nil {
+			service.ResetStatusCode(newAPIError, statusCodeMappingStr)
+			return newAPIError
+		}
+		usageDto := usage
+		if usageDto == nil {
+			usageDto = &dto.Usage{}
+		}
+		if strings.HasPrefix(info.OriginModelName, "gpt-4o-audio") {
+			service.PostAudioConsumeQuota(c, info, usageDto, "")
+		} else {
+			service.PostTextConsumeQuota(c, info, usageDto, nil)
+		}
+		return nil
+	}
+
 	var requestBody io.Reader
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
 		storage, err := common.GetBodyStorage(c)

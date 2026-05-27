@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 )
@@ -236,6 +237,8 @@ func updatePricing() {
 		}
 	}
 
+	appendResponsesViaChatEndpoints(modelSupportEndpointsStr, enableAbilities)
+
 	modelSupportEndpointTypes = make(map[string][]constant.EndpointType)
 	for model, endpoints := range modelSupportEndpointsStr {
 		supportedEndpoints := make([]constant.EndpointType, 0)
@@ -356,6 +359,35 @@ func updatePricing() {
 	modelEnableGroupsLock.Unlock()
 
 	lastGetPricingTime = time.Now()
+}
+
+func appendResponsesViaChatEndpoints(modelEndpoints map[string][]string, abilities []AbilityWithChannel) {
+	policy := model_setting.GetGlobalSettings().ResponsesToChatCompletionsPolicy
+	if !policy.Enabled {
+		return
+	}
+	for _, ability := range abilities {
+		if !isResponsesViaChatChannelType(ability.ChannelType) {
+			continue
+		}
+		if !policy.IsChannelEnabled(ability.ChannelId, ability.ChannelType) || !policy.IsModelEnabled(ability.Model) {
+			continue
+		}
+		endpoints := modelEndpoints[ability.Model]
+		bridgeEndpoint := string(constant.EndpointTypeOpenAIResponseViaChat)
+		if !common.StringsContains(endpoints, bridgeEndpoint) {
+			modelEndpoints[ability.Model] = append(endpoints, bridgeEndpoint)
+		}
+	}
+}
+
+func isResponsesViaChatChannelType(channelType int) bool {
+	switch channelType {
+	case constant.ChannelTypeOpenAI, constant.ChannelTypeOpenRouter, constant.ChannelTypeXinference:
+		return true
+	default:
+		return false
+	}
 }
 
 // GetSupportedEndpointMap 返回全局端点到路径的映射

@@ -66,10 +66,22 @@ const chatCompletionsToResponsesPolicyAllChannelsExample = JSON.stringify(
   2,
 );
 
+const responsesToChatCompletionsPolicyExample = JSON.stringify(
+  {
+    enabled: true,
+    all_channels: false,
+    channel_ids: [1, 2],
+    model_patterns: ['.*'],
+  },
+  null,
+  2,
+);
+
 const defaultGlobalSettingInputs = {
   'global.pass_through_request_enabled': false,
   'global.thinking_model_blacklist': '[]',
   'global.chat_completions_to_responses_policy': '{}',
+  'global.responses_to_chat_completions_policy': '{}',
   'general_setting.ping_interval_enabled': false,
   'general_setting.ping_interval_seconds': 60,
 };
@@ -83,23 +95,34 @@ export default function SettingGlobalModel(props) {
   const [inputsRow, setInputsRow] = useState(defaultGlobalSettingInputs);
   const chatCompletionsToResponsesPolicyKey =
     'global.chat_completions_to_responses_policy';
+  const responsesToChatCompletionsPolicyKey =
+    'global.responses_to_chat_completions_policy';
 
-  const setChatCompletionsToResponsesPolicyValue = (value) => {
+  const setPolicyValue = (key, value) => {
     setInputs((prev) => ({
       ...prev,
-      [chatCompletionsToResponsesPolicyKey]: value,
+      [key]: value,
     }));
     if (refForm.current) {
-      refForm.current.setValue(chatCompletionsToResponsesPolicyKey, value);
+      refForm.current.setValue(key, value);
     }
   };
+
+  const setChatCompletionsToResponsesPolicyValue = (value) =>
+    setPolicyValue(chatCompletionsToResponsesPolicyKey, value);
+
+  const setResponsesToChatCompletionsPolicyValue = (value) =>
+    setPolicyValue(responsesToChatCompletionsPolicyKey, value);
 
   const normalizeValueBeforeSave = (key, value) => {
     if (key === 'global.thinking_model_blacklist') {
       const text = typeof value === 'string' ? value.trim() : '';
       return text === '' ? '[]' : value;
     }
-    if (key === 'global.chat_completions_to_responses_policy') {
+    if (
+      key === 'global.chat_completions_to_responses_policy' ||
+      key === 'global.responses_to_chat_completions_policy'
+    ) {
       const text = typeof value === 'string' ? value.trim() : '';
       return text === '' ? '{}' : value;
     }
@@ -156,7 +179,10 @@ export default function SettingGlobalModel(props) {
             value = defaultGlobalSettingInputs[key];
           }
         }
-        if (key === 'global.chat_completions_to_responses_policy') {
+        if (
+          key === 'global.chat_completions_to_responses_policy' ||
+          key === 'global.responses_to_chat_completions_policy'
+        ) {
           try {
             value =
               value && String(value).trim() !== ''
@@ -343,6 +369,85 @@ export default function SettingGlobalModel(props) {
                             2,
                           );
                           setChatCompletionsToResponsesPolicyValue(formatted);
+                        } catch (error) {
+                          showError(t('不是合法的 JSON 字符串'));
+                        }
+                      }}
+                    >
+                      {t('格式化 JSON')}
+                    </Button>
+                  </div>
+                </Col>
+              </Row>
+
+              <Row style={{ marginTop: 10 }}>
+                <Col span={24}>
+                  <Form.TextArea
+                    label={t('Responses→ChatCompletions 参数配置')}
+                    field={responsesToChatCompletionsPolicyKey}
+                    placeholder={
+                      t('例如（指定渠道）：') +
+                      '\n' +
+                      responsesToChatCompletionsPolicyExample
+                    }
+                    rows={8}
+                    rules={[
+                      {
+                        validator: (rule, value) => {
+                          if (!value || value.trim() === '') return true;
+                          return verifyJSON(value);
+                        },
+                        message: t('不是合法的 JSON 字符串'),
+                      },
+                    ]}
+                    extraText={t(
+                      '用于将 Codex /v1/responses 请求桥接到仅支持 /v1/chat/completions 的上游渠道。',
+                    )}
+                    onChange={(value) =>
+                      setInputs((prev) => ({
+                        ...prev,
+                        [responsesToChatCompletionsPolicyKey]: value,
+                      }))
+                    }
+                  />
+                </Col>
+              </Row>
+
+              <Row style={{ marginTop: 10, marginBottom: 16 }}>
+                <Col span={24}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Button
+                      type='secondary'
+                      size='small'
+                      onClick={() =>
+                        setResponsesToChatCompletionsPolicyValue(
+                          responsesToChatCompletionsPolicyExample,
+                        )
+                      }
+                    >
+                      {t('填充模板（指定渠道）')}
+                    </Button>
+                    <Button
+                      type='secondary'
+                      size='small'
+                      onClick={() => {
+                        const raw =
+                          inputs[responsesToChatCompletionsPolicyKey];
+                        if (!raw || String(raw).trim() === '') return;
+                        try {
+                          const formatted = JSON.stringify(
+                            JSON.parse(raw),
+                            null,
+                            2,
+                          );
+                          setResponsesToChatCompletionsPolicyValue(formatted);
                         } catch (error) {
                           showError(t('不是合法的 JSON 字符串'));
                         }

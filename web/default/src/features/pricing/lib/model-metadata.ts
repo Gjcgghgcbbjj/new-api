@@ -36,6 +36,7 @@ import { hashStringToSeed, seededRandom } from './seed'
 const TEXT_INPUT_ENDPOINTS = new Set([
   'openai',
   'openai-response',
+  'openai-response-via-chat',
   'anthropic',
   'gemini',
   'embeddings',

@@ -74,6 +74,17 @@ const chatToResponsesPolicyAllChannelsExample = JSON.stringify(
   2
 )
 
+const responsesToChatPolicyExample = JSON.stringify(
+  {
+    enabled: true,
+    all_channels: false,
+    channel_ids: [1, 2],
+    model_patterns: ['.*'],
+  },
+  null,
+  2
+)
+
 const jsonString = z.string().refine((value) => {
   const trimmed = value.trim()
   if (!trimmed) return true
@@ -90,6 +101,7 @@ const schema = z.object({
     pass_through_request_enabled: z.boolean(),
     thinking_model_blacklist: jsonString,
     chat_completions_to_responses_policy: jsonString,
+    responses_to_chat_completions_policy: jsonString,
   }),
   general_setting: z.object({
     ping_interval_enabled: z.boolean(),
@@ -104,6 +116,7 @@ type FlatGlobalModelSettings = {
   'global.pass_through_request_enabled': boolean
   'global.thinking_model_blacklist': string
   'global.chat_completions_to_responses_policy': string
+  'global.responses_to_chat_completions_policy': string
   'general_setting.ping_interval_enabled': boolean
   'general_setting.ping_interval_seconds': number
 }
@@ -119,6 +132,10 @@ const flattenGlobalValues = (
   ),
   'global.chat_completions_to_responses_policy': normalizeJsonText(
     values.global.chat_completions_to_responses_policy,
+    '{}'
+  ),
+  'global.responses_to_chat_completions_policy': normalizeJsonText(
+    values.global.responses_to_chat_completions_policy,
     '{}'
   ),
   'general_setting.ping_interval_enabled':
@@ -159,6 +176,7 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
     field:
       | 'global.thinking_model_blacklist'
       | 'global.chat_completions_to_responses_policy'
+      | 'global.responses_to_chat_completions_policy'
   ) => {
     const raw = form.getValues(field)
     if (!raw || !raw.trim()) return
@@ -334,6 +352,60 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
                       onClick={() =>
                         formatJsonField(
                           'global.chat_completions_to_responses_policy'
+                        )
+                      }
+                    >
+                      {t('Format JSON')}
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='global.responses_to_chat_completions_policy'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Responses -> ChatCompletions Policy JSON')}
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={8}
+                      placeholder={`${t('Example (specific channels):')}\n${responsesToChatPolicyExample}`}
+                      {...field}
+                      onChange={(event) => field.onChange(event.target.value)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Use this for Codex /v1/responses requests routed to chat-completions-only upstream channels. Empty value will be saved as {}.'
+                    )}
+                  </FormDescription>
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() =>
+                        form.setValue(
+                          'global.responses_to_chat_completions_policy',
+                          responsesToChatPolicyExample,
+                          { shouldDirty: true }
+                        )
+                      }
+                    >
+                      {t('Fill example (specific channels)')}
+                    </Button>
+                    <Button
+                      type='button'
+                      variant='outline'
+                      size='sm'
+                      onClick={() =>
+                        formatJsonField(
+                          'global.responses_to_chat_completions_policy'
                         )
                       }
                     >

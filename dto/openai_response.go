@@ -290,6 +290,7 @@ type OpenAIResponsesResponse struct {
 	Usage              *Usage             `json:"usage"`
 	User               json.RawMessage    `json:"user"`
 	Metadata           json.RawMessage    `json:"metadata"`
+	OutputText         string             `json:"output_text,omitempty"`
 }
 
 // GetOpenAIError 从动态错误类型中提取OpenAIError结构

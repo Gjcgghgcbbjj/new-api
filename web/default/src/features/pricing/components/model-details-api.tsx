@@ -80,6 +80,23 @@ const LANG_HIGHLIGHT: Record<Lang, BundledLanguage> = {
   javascript: 'javascript',
 }
 
+const ENDPOINT_LABELS: Record<string, string> = {
+  openai: 'Chat',
+  'openai-response': 'Response',
+  'openai-response-via-chat': 'Response via Chat',
+  'openai-response-compact': 'Response Compact',
+  anthropic: 'Anthropic',
+  gemini: 'Gemini',
+  'jina-rerank': 'Rerank',
+  'image-generation': 'Image',
+  embeddings: 'Embeddings',
+  'openai-video': 'Video',
+}
+
+function formatEndpointLabel(endpointType: string): string {
+  return ENDPOINT_LABELS[endpointType] || endpointType
+}
+
 type SampleContext = {
   baseUrl: string
   apiKeyEnv: string
@@ -90,7 +107,9 @@ type SampleContext = {
 
 function buildChatSample(lang: Lang, ctx: SampleContext): string {
   const url = `${ctx.baseUrl}${ctx.endpointPath}`
-  const isResponses = ctx.endpointType === 'openai-response'
+  const isResponses =
+    ctx.endpointType === 'openai-response' ||
+    ctx.endpointType === 'openai-response-via-chat'
   const isReasoning = /^o[1-4]|reasoning|thinking|deepseek-r/i.test(
     ctx.modelName
   )
@@ -515,7 +534,7 @@ function CodeSamplesSection(props: {
                   value={ep.type}
                   className='h-7 px-2.5 text-xs'
                 >
-                  {ep.type}
+                  {formatEndpointLabel(ep.type)}
                 </TabsTrigger>
               ))}
             </TabsList>
