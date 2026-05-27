@@ -3294,6 +3294,7 @@
     "Request body pass-through is enabled. The request body will be sent directly to the upstream without any conversion.": "请求体透传已启用。请求体将直接发送到上游，不进行任何转换。",
     "Request conversion": "请求转换",
     "Request Conversion": "请求转换",
+    "Upstream Path": "上游路径",
     "Request Count": "请求计数",
     "Request failed": "请求失败",
     "Request flow": "请求流",

@@ -533,6 +533,12 @@ export const useLogsData = () => {
           value: other.request_path,
         });
       }
+      if (other?.upstream_request_path) {
+        expandDataLocal.push({
+          key: t('上游请求路径'),
+          value: other.upstream_request_path,
+        });
+      }
       if (isAdminUser && other?.stream_status) {
         const ss = other.stream_status;
         const isOk = ss.status === 'ok';

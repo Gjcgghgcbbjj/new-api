@@ -34,6 +34,7 @@ func responsesViaChatCompletions(c *gin.Context, info *relaycommon.RelayInfo, ad
 
 	info.RelayMode = relayconstant.RelayModeChatCompletions
 	info.RequestURLPath = "/v1/chat/completions"
+	info.UpstreamRequestURLPath = info.RequestURLPath
 	info.AppendRequestConversion(types.RelayFormatOpenAI)
 
 	convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, chatReq)

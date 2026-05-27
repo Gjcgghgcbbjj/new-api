@@ -478,7 +478,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const showConversion =
     props.isAdmin &&
     props.log.type !== 6 &&
-    (other?.request_path || conversionChain.length > 0)
+    (other?.request_path ||
+      other?.upstream_request_path ||
+      conversionChain.length > 0)
 
   const useChannel = other?.admin_info?.use_channel
   const channelChain =
@@ -641,6 +643,13 @@ export function DetailsDialog(props: DetailsDialogProps) {
                       <DetailRow
                         label={t('Path')}
                         value={other.request_path}
+                        mono
+                      />
+                    )}
+                    {other?.upstream_request_path && (
+                      <DetailRow
+                        label={t('Upstream Path')}
+                        value={other.upstream_request_path}
                         mono
                       />
                     )}
