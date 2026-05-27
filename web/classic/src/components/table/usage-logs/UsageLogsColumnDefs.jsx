@@ -429,7 +429,7 @@ function renderCompactDetailSummary(summarySegments) {
   );
 }
 
-function getRequestProtocolSegment(other, t) {
+function getRequestProtocolDisplay(other, t) {
   if (!other) {
     return null;
   }
@@ -466,9 +466,8 @@ function getRequestProtocolSegment(other, t) {
   }
 
   return {
-    text: `${t('接口')}：${pathText}`,
+    text: pathText,
     tooltip: tooltipParts.join('\n'),
-    tone: 'secondary',
   };
 }
 
@@ -484,8 +483,6 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
   if (other == null || record.type !== 2) {
     return null;
   }
-
-  const protocolSegment = getRequestProtocolSegment(other, t);
 
   if (
     other?.violation_fee === true ||
@@ -509,7 +506,7 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
     ].filter(Boolean);
 
     return {
-      segments: protocolSegment ? [...segments, protocolSegment] : segments,
+      segments,
     };
   }
 
@@ -523,7 +520,7 @@ function getUsageLogDetailSummary(record, text, billingDisplayMode, t) {
         : renderModelPriceSimple({ ...summaryOpts, provider: 'openai' });
 
   return {
-    segments: protocolSegment ? [...segments, protocolSegment] : segments,
+    segments,
   };
 }
 
@@ -730,6 +727,61 @@ export const getLogsColumns = ({
       dataIndex: 'type',
       render: (text, record, index) => {
         return <>{renderType(text, t)}</>;
+      },
+    },
+    {
+      key: COLUMN_KEYS.PROTOCOL,
+      title: t('接口'),
+      dataIndex: 'other',
+      width: 190,
+      render: (text, record, index) => {
+        if (!(record.type === 2 || record.type === 5)) {
+          return <></>;
+        }
+
+        const other = getLogOther(record.other);
+        const protocol = getRequestProtocolDisplay(other, t);
+        if (!protocol?.text) {
+          return <></>;
+        }
+
+        return (
+          <Tooltip content={protocol.tooltip || protocol.text}>
+            <span>
+              <Tag
+                color='blue'
+                shape='circle'
+                onClick={(event) => {
+                  copyText(event, protocol.text);
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    maxWidth: 165,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'bottom',
+                  }}
+                >
+                  <Route size={12} />
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      minWidth: 0,
+                    }}
+                  >
+                    {protocol.text}
+                  </span>
+                </span>
+              </Tag>
+            </span>
+          </Tooltip>
+        );
       },
     },
     {

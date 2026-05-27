@@ -54,6 +54,7 @@ export const useLogsData = () => {
     TOKEN: 'token',
     GROUP: 'group',
     TYPE: 'type',
+    PROTOCOL: 'protocol',
     MODEL: 'model',
     USE_TIME: 'use_time',
     PROMPT: 'prompt',
@@ -117,6 +118,7 @@ export const useLogsData = () => {
       [COLUMN_KEYS.TOKEN]: true,
       [COLUMN_KEYS.GROUP]: true,
       [COLUMN_KEYS.TYPE]: true,
+      [COLUMN_KEYS.PROTOCOL]: true,
       [COLUMN_KEYS.MODEL]: true,
       [COLUMN_KEYS.USE_TIME]: true,
       [COLUMN_KEYS.PROMPT]: true,
@@ -531,31 +533,6 @@ export const useLogsData = () => {
         expandDataLocal.push({
           key: t('请求路径'),
           value: other.request_path,
-        });
-      }
-      if (
-        logs[i].type === 2 &&
-        (other?.request_path ||
-          other?.upstream_request_path ||
-          Array.isArray(other?.request_conversion))
-      ) {
-        const requestPath = other?.request_path || '-';
-        const upstreamPath = other?.upstream_request_path || requestPath;
-        const conversionText = requestConversionDisplayValue(
-          other?.request_conversion,
-        );
-        const processLines = [
-          `${t('入口接口')}：${requestPath}`,
-          `${t('上游接口')}：${upstreamPath}`,
-          `${t('转换过程')}：${conversionText}`,
-        ];
-        expandDataLocal.push({
-          key: t('接口过程'),
-          value: (
-            <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-              {processLines.join('\n')}
-            </div>
-          ),
         });
       }
       if (other?.upstream_request_path) {
