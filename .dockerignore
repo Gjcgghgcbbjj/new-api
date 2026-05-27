@@ -7,6 +7,11 @@ Makefile
 docs
 .eslintcache
 .gocache
+.tools
+*.db
+*.exe
+data
+logs
 /web/node_modules
 /web/default/node_modules
 /web/default/dist
