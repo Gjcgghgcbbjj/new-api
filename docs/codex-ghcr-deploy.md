@@ -3,10 +3,11 @@
 这个分支的 Docker 镜像由 GitHub Actions 自动构建并推送到 GitHub Container Registry:
 
 ```text
-ghcr.io/gjcgghgcbbjj/new-api:codex-latest
+ghcr.io/gjcgghgcbbjj/new-api:codex-20260527-8717770
 ```
 
 当前自动发布的是 `linux/amd64` 镜像，适合绝大多数 x86_64 VPS。
+同时也会发布滚动 tag：`ghcr.io/gjcgghgcbbjj/new-api:codex-latest`。
 
 ## VPS 快速部署
 

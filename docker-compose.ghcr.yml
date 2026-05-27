@@ -1,6 +1,6 @@
 services:
   new-api:
-    image: ghcr.io/gjcgghgcbbjj/new-api:codex-latest
+    image: ghcr.io/gjcgghgcbbjj/new-api:codex-20260527-8717770
     container_name: new-api
     restart: always
     command: --log-dir /app/logs
