@@ -749,23 +749,13 @@ export const getLogsColumns = ({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 4,
-                    maxWidth: 165,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-all',
                     verticalAlign: 'bottom',
                   }}
                 >
                   <Route size={12} />
-                  <span
-                    style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      minWidth: 0,
-                    }}
-                  >
-                    {protocol.text}
-                  </span>
+                  <span>{protocol.text}</span>
                 </span>
               </Tag>
             </span>

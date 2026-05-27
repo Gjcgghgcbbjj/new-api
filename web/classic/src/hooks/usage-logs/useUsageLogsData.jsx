@@ -548,7 +548,7 @@ export const useLogsData = () => {
           `${t('转换过程')}：${conversionText}`,
         ];
         expandDataLocal.push({
-          key: t('接口过程'),
+          key: t('入口接口'),
           value: (
             <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
               {processLines.join('\n')}
