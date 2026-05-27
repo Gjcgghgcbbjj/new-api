@@ -429,7 +429,7 @@ function renderCompactDetailSummary(summarySegments) {
   );
 }
 
-function getRequestProtocolDisplay(other, t) {
+function getEntryInterfaceDisplay(other, t) {
   if (!other) {
     return null;
   }
@@ -440,33 +440,22 @@ function getRequestProtocolDisplay(other, t) {
     ? other.request_conversion.filter(Boolean)
     : [];
 
-  if (!requestPath && !upstreamPath && chain.length <= 1) {
+  if (!requestPath) {
     return null;
   }
 
-  const visibleParts = [];
-  if (requestPath) {
-    visibleParts.push(requestPath);
-  }
-  if (upstreamPath && upstreamPath !== requestPath) {
-    visibleParts.push(upstreamPath);
-  }
-
   const chainText = chain.length > 1 ? chain.join(' -> ') : '';
-  const pathText = visibleParts.length > 0 ? visibleParts.join(' -> ') : chainText;
   const tooltipParts = [];
-  if (requestPath) {
-    tooltipParts.push(`${t('请求路径')}：${requestPath}`);
-  }
+  tooltipParts.push(`${t('入口接口')}：${requestPath}`);
   if (upstreamPath) {
-    tooltipParts.push(`${t('上游请求路径')}：${upstreamPath}`);
+    tooltipParts.push(`${t('上游接口')}：${upstreamPath}`);
   }
   if (chainText) {
-    tooltipParts.push(`${t('请求转换')}：${chainText}`);
+    tooltipParts.push(`${t('转换过程')}：${chainText}`);
   }
 
   return {
-    text: pathText,
+    text: requestPath,
     tooltip: tooltipParts.join('\n'),
   };
 }
@@ -731,7 +720,7 @@ export const getLogsColumns = ({
     },
     {
       key: COLUMN_KEYS.PROTOCOL,
-      title: t('接口'),
+      title: t('入口接口'),
       dataIndex: 'other',
       width: 190,
       render: (text, record, index) => {
@@ -740,7 +729,7 @@ export const getLogsColumns = ({
         }
 
         const other = getLogOther(record.other);
-        const protocol = getRequestProtocolDisplay(other, t);
+        const protocol = getEntryInterfaceDisplay(other, t);
         if (!protocol?.text) {
           return <></>;
         }

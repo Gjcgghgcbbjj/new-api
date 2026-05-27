@@ -529,13 +529,39 @@ export const useLogsData = () => {
           });
         }
       }
-      if (other?.request_path) {
+      const hasRequestProcess =
+        logs[i].type !== 6 &&
+        logs[i].type !== 1 &&
+        (other?.request_path ||
+          other?.upstream_request_path ||
+          (Array.isArray(other?.request_conversion) &&
+            other.request_conversion.length > 0));
+      if (hasRequestProcess) {
+        const requestPath = other?.request_path || '-';
+        const upstreamPath = other?.upstream_request_path || '-';
+        const conversionText = requestConversionDisplayValue(
+          other?.request_conversion,
+        );
+        const processLines = [
+          `${t('入口接口')}：${requestPath}`,
+          `${t('上游接口')}：${upstreamPath}`,
+          `${t('转换过程')}：${conversionText}`,
+        ];
+        expandDataLocal.push({
+          key: t('接口过程'),
+          value: (
+            <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+              {processLines.join('\n')}
+            </div>
+          ),
+        });
+      } else if (other?.request_path) {
         expandDataLocal.push({
           key: t('请求路径'),
           value: other.request_path,
         });
       }
-      if (other?.upstream_request_path) {
+      if (!hasRequestProcess && other?.upstream_request_path) {
         expandDataLocal.push({
           key: t('上游请求路径'),
           value: other.upstream_request_path,
@@ -631,7 +657,12 @@ export const useLogsData = () => {
           ),
         });
       }
-      if (isAdminUser && logs[i].type !== 6 && logs[i].type !== 1) {
+      if (
+        isAdminUser &&
+        logs[i].type !== 6 &&
+        logs[i].type !== 1 &&
+        !hasRequestProcess
+      ) {
         expandDataLocal.push({
           key: t('请求转换'),
           value: requestConversionDisplayValue(other?.request_conversion),
