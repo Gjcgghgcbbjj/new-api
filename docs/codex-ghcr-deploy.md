@@ -6,6 +6,8 @@
 ghcr.io/gjcgghgcbbjj/new-api:codex-latest
 ```
 
+当前自动发布的是 `linux/amd64` 镜像，适合绝大多数 x86_64 VPS。
+
 ## VPS 快速部署
 
 ```bash
