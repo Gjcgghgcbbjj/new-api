@@ -8,8 +8,10 @@ upload
 build
 *.db-journal
 logs
-web/default/dist
-web/classic/dist
+web/default/dist/*
+!web/default/dist/index.html
+web/classic/dist/*
+!web/classic/dist/index.html
 web/node_modules
 web/dist
 .env

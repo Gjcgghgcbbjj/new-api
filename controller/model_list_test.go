@@ -155,6 +155,7 @@ func pricingByModelName(pricings []model.Pricing) map[string]model.Pricing {
 }
 
 func TestListModelsIncludesTieredBillingModel(t *testing.T) {
+	db := setupModelListControllerTestDB(t)
 	withSelfUseModeDisabled(t)
 	withTieredBillingConfig(t, map[string]string{
 		"zz-tiered-visible-model":      "tiered_expr",
@@ -165,7 +166,6 @@ func TestListModelsIncludesTieredBillingModel(t *testing.T) {
 		"zz-tiered-empty-expr-model": "   ",
 	})
 
-	db := setupModelListControllerTestDB(t)
 	require.NoError(t, db.Create(&model.User{
 		Id:       1001,
 		Username: "model-list-user",
@@ -211,6 +211,7 @@ func TestListModelsIncludesTieredBillingModel(t *testing.T) {
 }
 
 func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
+	setupModelListControllerTestDB(t)
 	withSelfUseModeDisabled(t)
 	withTieredBillingConfig(t, map[string]string{
 		"zz-token-tiered-visible-model":      "tiered_expr",
@@ -224,6 +225,7 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	common.SetContextKey(ctx, constant.ContextKeyUserGroup, "default")
 	common.SetContextKey(ctx, constant.ContextKeyTokenModelLimitEnabled, true)
 	common.SetContextKey(ctx, constant.ContextKeyTokenModelLimit, map[string]bool{
 		"zz-token-tiered-visible-model":      true,

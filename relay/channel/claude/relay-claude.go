@@ -1,10 +1,12 @@
 package claude
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -376,6 +378,12 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 								Text: common.GetPointer[string](mediaMessage.Text),
 							})
 						}
+					case dto.ContentTypeFile:
+						fileMessages, err := openAIFileContentToClaude(c, mediaMessage)
+						if err != nil {
+							return nil, err
+						}
+						claudeMediaMessages = append(claudeMediaMessages, fileMessages...)
 					default:
 						source := mediaMessage.ToFileSource()
 						if source == nil {
@@ -576,6 +584,69 @@ func ResponseClaude2OpenAI(claudeResponse *dto.ClaudeResponse) *dto.OpenAITextRe
 	choices = append(choices, choice)
 	fullTextResponse.Choices = choices
 	return &fullTextResponse
+}
+
+func openAIFileContentToClaude(c *gin.Context, mediaMessage dto.MediaContent) ([]dto.ClaudeMediaMessage, error) {
+	file := mediaMessage.GetFile()
+	if file == nil || file.FileData == "" {
+		return nil, nil
+	}
+
+	mimeType := mimeTypeFromOpenAIFile(file)
+	source := types.NewFileSourceFromData(file.FileData, mimeType)
+	if source == nil {
+		return nil, nil
+	}
+	base64Data, loadedMimeType, err := service.GetBase64Data(c, source, "formatting file for Claude")
+	if err != nil {
+		return nil, fmt.Errorf("get file data failed: %s", err.Error())
+	}
+	if loadedMimeType != "" {
+		mimeType = loadedMimeType
+	}
+
+	switch {
+	case strings.HasPrefix(mimeType, "application/pdf"):
+		return []dto.ClaudeMediaMessage{{
+			Type: "document",
+			Source: &dto.ClaudeMessageSource{
+				Type:      "base64",
+				MediaType: mimeType,
+				Data:      base64Data,
+			},
+		}}, nil
+	case strings.HasPrefix(mimeType, "text/"):
+		text, err := base64.StdEncoding.DecodeString(base64Data)
+		if err != nil {
+			return nil, fmt.Errorf("decode text file failed: %s", err.Error())
+		}
+		if len(text) == 0 {
+			return nil, nil
+		}
+		return []dto.ClaudeMediaMessage{{
+			Type: "text",
+			Text: common.GetPointer[string](string(text)),
+		}}, nil
+	case strings.HasPrefix(mimeType, "image/"):
+		return []dto.ClaudeMediaMessage{{
+			Type: "image",
+			Source: &dto.ClaudeMessageSource{
+				Type:      "base64",
+				MediaType: mimeType,
+				Data:      base64Data,
+			},
+		}}, nil
+	default:
+		return nil, nil
+	}
+}
+
+func mimeTypeFromOpenAIFile(file *dto.MessageFile) string {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(file.FileName)), ".")
+	if ext == "" {
+		return ""
+	}
+	return service.GetMimeTypeByExtension(ext)
 }
 
 type ClaudeResponseInfo struct {
