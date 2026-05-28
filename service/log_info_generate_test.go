@@ -37,7 +37,7 @@ func TestGenerateTextOtherInfoIncludesUpstreamRequestPath(t *testing.T) {
 	require.Equal(t, []string{"OpenAI Responses", "OpenAI Compatible"}, other["request_conversion"])
 }
 
-func TestGenerateTextOtherInfoOmitsDuplicateUpstreamRequestPath(t *testing.T) {
+func TestGenerateTextOtherInfoKeepsDuplicateUpstreamRequestPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
@@ -54,6 +54,6 @@ func TestGenerateTextOtherInfoOmitsDuplicateUpstreamRequestPath(t *testing.T) {
 	other := GenerateTextOtherInfo(ctx, info, 1, 1, 1, 0, 1, 0, -1)
 
 	require.Equal(t, "/v1/chat/completions", other["request_path"])
-	require.NotContains(t, other, "upstream_request_path")
+	require.Equal(t, "/v1/chat/completions", other["upstream_request_path"])
 	require.Equal(t, []string{"OpenAI Compatible"}, other["request_conversion"])
 }

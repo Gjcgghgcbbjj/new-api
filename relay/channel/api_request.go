@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -309,6 +310,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
+	recordUpstreamRequestURLPath(info, fullRequestURL)
 	logger.LogDebug(c, "fullRequestURL: %s", fullRequestURL)
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
@@ -339,6 +341,7 @@ func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBod
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
+	recordUpstreamRequestURLPath(info, fullRequestURL)
 	logger.LogDebug(c, "fullRequestURL: %s", fullRequestURL)
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
@@ -371,6 +374,7 @@ func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
+	recordUpstreamRequestURLPath(info, fullRequestURL)
 	targetHeader := http.Header{}
 	err = a.SetupRequestHeader(c, &targetHeader, info)
 	if err != nil {
@@ -394,6 +398,24 @@ func DoWssRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	//all, err := io.ReadAll(requestBody)
 	//err = service.WssString(c, targetConn, string(all))
 	return targetConn, nil
+}
+
+func recordUpstreamRequestURLPath(info *common.RelayInfo, fullRequestURL string) {
+	if info == nil {
+		return
+	}
+	parsed, err := url.Parse(fullRequestURL)
+	if err == nil && parsed.Path != "" {
+		path := parsed.EscapedPath()
+		if parsed.RawQuery != "" {
+			path += "?" + parsed.RawQuery
+		}
+		info.UpstreamRequestURLPath = path
+		return
+	}
+	if info.RequestURLPath != "" {
+		info.UpstreamRequestURLPath = info.RequestURLPath
+	}
 }
 
 func startPingKeepAlive(c *gin.Context, pingInterval time.Duration) context.CancelFunc {

@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay/channel"
 	openaichannel "github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -96,10 +97,47 @@ func shouldResponsesUseChatCompletionsBridge(info *relaycommon.RelayInfo, reques
 	if info.RelayMode != relayconstant.RelayModeResponses {
 		return false
 	}
-	switch info.ApiType {
-	case constant.APITypeOpenAI, constant.APITypeOpenRouter, constant.APITypeXinference:
+	if !isResponsesViaChatBridgeCapableChannel(info.ChannelType) {
+		return false
+	}
+	if supportsNativeResponses(info, request.Model) {
+		return false
+	}
+	return true
+}
+
+func isResponsesViaChatBridgeCapableChannel(channelType int) bool {
+	switch channelType {
+	case constant.ChannelTypeOpenAI, constant.ChannelTypeOpenRouter, constant.ChannelTypeXinference:
+		return true
 	default:
 		return false
 	}
-	return service.ShouldResponsesUseChatCompletionsGlobal(info.ChannelId, info.ChannelType, request.Model)
+}
+
+func supportsNativeResponses(info *relaycommon.RelayInfo, requestModel string) bool {
+	if info == nil {
+		return false
+	}
+	if endpointTypesSupportNativeResponses(model.GetModelSupportEndpointTypes(requestModel)) {
+		return true
+	}
+	if endpointTypesSupportNativeResponses(common.GetEndpointTypesByChannelType(info.ChannelType, requestModel)) {
+		return true
+	}
+	if info.ChannelType != constant.ChannelTypeOpenAI {
+		return false
+	}
+	baseURL := strings.TrimRight(strings.ToLower(strings.TrimSpace(info.ChannelBaseUrl)), "/")
+	return baseURL == "https://api.openai.com" || baseURL == "https://api.openai.com/v1"
+}
+
+func endpointTypesSupportNativeResponses(endpoints []constant.EndpointType) bool {
+	for _, endpoint := range endpoints {
+		switch endpoint {
+		case constant.EndpointTypeOpenAIResponse, constant.EndpointTypeOpenAIResponseCompact:
+			return true
+		}
+	}
+	return false
 }

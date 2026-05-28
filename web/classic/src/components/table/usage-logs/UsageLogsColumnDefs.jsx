@@ -435,7 +435,7 @@ function getEntryInterfaceDisplay(other, t) {
   }
 
   const requestPath = other.request_path || '';
-  const upstreamPath = other.upstream_request_path || '';
+  const upstreamPath = other.upstream_request_path || requestPath;
   const chain = Array.isArray(other.request_conversion)
     ? other.request_conversion.filter(Boolean)
     : [];
@@ -444,15 +444,11 @@ function getEntryInterfaceDisplay(other, t) {
     return null;
   }
 
-  const chainText = chain.length > 1 ? chain.join(' -> ') : '';
+  const chainText = chain.length > 1 ? chain.join(' -> ') : t('原生格式');
   const tooltipParts = [];
   tooltipParts.push(`${t('入口接口')}：${requestPath}`);
-  if (upstreamPath) {
-    tooltipParts.push(`${t('上游接口')}：${upstreamPath}`);
-  }
-  if (chainText) {
-    tooltipParts.push(`${t('转换过程')}：${chainText}`);
-  }
+  tooltipParts.push(`${t('上游接口')}：${upstreamPath}`);
+  tooltipParts.push(`${t('转换过程')}：${chainText}`);
 
   return {
     text: requestPath,

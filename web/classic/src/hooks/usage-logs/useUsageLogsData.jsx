@@ -538,7 +538,7 @@ export const useLogsData = () => {
             other.request_conversion.length > 0));
       if (hasRequestProcess) {
         const requestPath = other?.request_path || '-';
-        const upstreamPath = other?.upstream_request_path || '-';
+        const upstreamPath = other?.upstream_request_path || requestPath;
         const conversionText = requestConversionDisplayValue(
           other?.request_conversion,
         );

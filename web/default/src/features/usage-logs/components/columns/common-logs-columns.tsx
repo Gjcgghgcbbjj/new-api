@@ -92,42 +92,32 @@ function getGroupRatioText(other: LogOtherData | null): string | null {
   return null
 }
 
-function getRequestProtocolSegment(
+function getEntryInterfaceDisplay(
   other: LogOtherData | null,
   t: (key: string, opts?: Record<string, unknown>) => string
-): DetailSegment | null {
+): { text: string; tooltip: string } | null {
   if (!other) return null
 
   const requestPath = other.request_path || ''
-  const upstreamPath = other.upstream_request_path || ''
+  const upstreamPath = other.upstream_request_path || requestPath
   const conversionChain = Array.isArray(other.request_conversion)
     ? other.request_conversion.filter(Boolean)
     : []
 
-  if (!requestPath && !upstreamPath && conversionChain.length <= 1) {
+  if (!requestPath) {
     return null
   }
 
-  const visibleParts: string[] = []
-  if (requestPath) visibleParts.push(requestPath)
-  if (upstreamPath && upstreamPath !== requestPath) {
-    visibleParts.push(upstreamPath)
-  }
-
   const conversionText =
-    conversionChain.length > 1 ? conversionChain.join(' -> ') : ''
-  const pathText =
-    visibleParts.length > 0 ? visibleParts.join(' -> ') : conversionText
+    conversionChain.length > 1 ? conversionChain.join(' -> ') : t('Native format')
   const tooltipParts = [
-    requestPath ? `${t('Path')}: ${requestPath}` : null,
-    upstreamPath ? `${t('Upstream Path')}: ${upstreamPath}` : null,
-    conversionText ? `${t('Request conversion')}: ${conversionText}` : null,
+    `${t('Entry Interface')}: ${requestPath}`,
+    `${t('Upstream Interface')}: ${upstreamPath}`,
+    `${t('Conversion Process')}: ${conversionText}`,
   ].filter(Boolean)
 
   return {
-    text: `${t('Interface')}: ${pathText}`,
-    muted: true,
-    protocol: true,
+    text: requestPath,
     tooltip: tooltipParts.join('\n'),
   }
 }
@@ -163,8 +153,6 @@ function buildDetailSegments(
       text: `${t('Fee')}: ${formatLogQuota(other?.fee_quota ?? log.quota)}`,
       muted: true,
     })
-    const protocolSegment = getRequestProtocolSegment(other, t)
-    if (protocolSegment) segments.push(protocolSegment)
     return segments
   }
 
@@ -300,9 +288,6 @@ function buildDetailSegments(
       danger: true,
     })
   }
-
-  const protocolSegment = getRequestProtocolSegment(other, t)
-  if (protocolSegment) segments.push(protocolSegment)
 
   return segments
 }
@@ -572,6 +557,47 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
   columns.push(
     {
+      id: 'entry_interface',
+      accessorFn: (row) => row.other,
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Entry Interface')} />
+      ),
+      cell: ({ row }) => {
+        const log = row.original
+        if (!isDisplayableLogType(log.type)) return null
+
+        const other = parseLogOther(log.other)
+        const entry = getEntryInterfaceDisplay(other, t)
+        if (!entry) return null
+
+        return (
+          <TooltipProvider delay={300}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div className='flex min-w-[160px] max-w-[280px] items-start gap-1 font-mono text-xs whitespace-normal' />
+                }
+              >
+                <Route
+                  className='text-muted-foreground mt-0.5 size-3 shrink-0'
+                  aria-hidden='true'
+                />
+                <span className='break-all'>{entry.text}</span>
+              </TooltipTrigger>
+              {entry.tooltip && (
+                <TooltipContent className='max-w-xs whitespace-pre-line break-all'>
+                  {entry.tooltip}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        )
+      },
+      meta: { label: t('Entry Interface') },
+      size: 220,
+    },
+
+    {
       accessorKey: 'model_name',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title={t('Model')} />
@@ -820,13 +846,8 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         const other = parseLogOther(log.other)
 
         const segments = buildDetailSegments(log, other, t)
-        const protocolSegment = segments.find((segment) => segment.protocol)
-        const billingSegments = segments.filter((segment) => !segment.protocol)
-        const primary = billingSegments[0] || protocolSegment
-        const displayedCount =
-          (primary ? 1 : 0) +
-          (protocolSegment && protocolSegment !== primary ? 1 : 0)
-        const remainingCount = Math.max(segments.length - displayedCount, 0)
+        const primary = segments[0]
+        const remainingCount = Math.max(segments.length - (primary ? 1 : 0), 0)
 
         return (
           <>
@@ -860,25 +881,6 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
                 </span>
               ) : (
                 <span className='text-muted-foreground/40'>—</span>
-              )}
-              {protocolSegment && protocolSegment !== primary && (
-                <TooltipProvider delay={300}>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <span className='text-muted-foreground flex max-w-full items-center gap-1 truncate leading-snug group-hover:underline' />
-                      }
-                    >
-                      <Route className='size-3 shrink-0' aria-hidden='true' />
-                      <span className='truncate'>{protocolSegment.text}</span>
-                    </TooltipTrigger>
-                    {protocolSegment.tooltip && (
-                      <TooltipContent className='max-w-xs whitespace-pre-line break-all'>
-                        {protocolSegment.tooltip}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
               )}
             </button>
             <DetailsDialog

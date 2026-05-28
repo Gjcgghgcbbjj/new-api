@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Copy,
   Check,
-  Route,
   Settings2,
   AlertTriangle,
   Headphones,
@@ -475,12 +474,17 @@ export function DetailsDialog(props: DetailsDialogProps) {
     conversionChain.length <= 1
       ? t('Native format')
       : conversionChain.join(' -> ')
+  const requestPath = other?.request_path || ''
+  const upstreamPath = other?.upstream_request_path || requestPath
+  const requestProcessText = [
+    `${t('Entry Interface')}: ${requestPath || '-'}`,
+    `${t('Upstream Interface')}: ${upstreamPath || '-'}`,
+    `${t('Conversion Process')}: ${conversionLabel}`,
+  ].join('\n')
   const showConversion =
     props.isAdmin &&
     props.log.type !== 6 &&
-    (other?.request_path ||
-      other?.upstream_request_path ||
-      conversionChain.length > 0)
+    (requestPath || upstreamPath || conversionChain.length > 0)
 
   const useChannel = other?.admin_info?.use_channel
   const channelChain =
@@ -620,48 +624,40 @@ export function DetailsDialog(props: DetailsDialogProps) {
               )}
             </div>
 
-            {/* Request conversion (admin only, not for refund) */}
+            {/* Request interface process (admin only, not for refund) */}
             {showConversion && (
-              <DetailSection label={t('Request Conversion')}>
+              <DetailSection label={t('Entry Interface')}>
                 <div className='relative min-w-0'>
                   <Button
                     variant='ghost'
                     size='sm'
                     className='absolute top-0 right-0 h-5 w-5 p-0'
-                    onClick={() => copyToClipboard(conversionLabel)}
+                    onClick={() => copyToClipboard(requestProcessText)}
                     title={t('Copy to clipboard')}
                     aria-label={t('Copy to clipboard')}
                   >
-                    {copiedText === conversionLabel ? (
+                    {copiedText === requestProcessText ? (
                       <Check className='size-3 text-green-600' />
                     ) : (
                       <Copy className='size-3' />
                     )}
                   </Button>
                   <div className='min-w-0 space-y-1 pr-6'>
-                    {other?.request_path && (
-                      <DetailRow
-                        label={t('Path')}
-                        value={other.request_path}
-                        mono
-                      />
-                    )}
-                    {other?.upstream_request_path && (
-                      <DetailRow
-                        label={t('Upstream Path')}
-                        value={other.upstream_request_path}
-                        mono
-                      />
-                    )}
-                    <div className='flex min-w-0 items-center gap-1.5 text-xs'>
-                      <Route
-                        className='text-muted-foreground size-3'
-                        aria-hidden='true'
-                      />
-                      <span className='min-w-0 break-all sm:break-words'>
-                        {conversionLabel}
-                      </span>
-                    </div>
+                    <DetailRow
+                      label={t('Entry Interface')}
+                      value={requestPath || '-'}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('Upstream Interface')}
+                      value={upstreamPath || '-'}
+                      mono
+                    />
+                    <DetailRow
+                      label={t('Conversion Process')}
+                      value={conversionLabel}
+                      mono
+                    />
                   </div>
                 </div>
               </DetailSection>

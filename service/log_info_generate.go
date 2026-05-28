@@ -47,9 +47,6 @@ func appendUpstreamRequestPath(relayInfo *relaycommon.RelayInfo, other map[strin
 	if path == "" {
 		return
 	}
-	if requestPath, ok := other["request_path"].(string); ok && requestPath == path {
-		return
-	}
 	other["upstream_request_path"] = path
 }
 
