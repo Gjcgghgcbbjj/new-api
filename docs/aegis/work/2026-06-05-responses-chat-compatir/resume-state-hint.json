@@ -2,9 +2,9 @@
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-06-05-responses-chat-compatir",
   "lastCheckpointRef": "docs/aegis/work/2026-06-05-responses-chat-compatir/todo-checkpoint-draft.json",
-  "resumeInstruction": "Resume from docs/aegis/plans/2026-06-05-responses-chat-compatir.md Task 5 in .worktrees/responses-chat-compatir",
+  "resumeInstruction": "Resume from docs/aegis/work/2026-06-05-responses-chat-compatir/todo-checkpoint-draft.json in .worktrees/responses-chat-compatir if more hardening is requested",
   "knownPartialWork": [
-    "Task 4: migrated Chat/Responses stream conversion through CompatIR and retired relay-local semantic mapping branches"
+    "Follow-up hardening added the CompatIR owner ADR and extra stream fixtures"
   ],
   "mustReadBeforeContinuing": [
     "docs/aegis/work/2026-06-05-responses-chat-compatir/10-intent.md",

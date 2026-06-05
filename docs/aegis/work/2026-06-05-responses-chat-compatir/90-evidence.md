@@ -33,3 +33,11 @@ No evidence has been recorded yet.
 - Source: PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/compatir ./service/openaicompat ./relay/channel/openai -run 'Stream|Responses|Chat|Bridge|CompatIR' -count=1 && git diff --check
 - Summary: Task 4 stream conversion routes through CompatIR; focused compatir/openaicompat/openai relay regression passed; handler-local stream semantic mapping branches retired
 - Verifier: codex
+
+## EvidenceBundleDraft
+
+- Artifact key: task6-adr-stream-fixtures
+- Type: test
+- Source: PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/compatir -run 'Stream|CompatIR' -count=1 && PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/... ./relay/... -count=1 && git diff --check
+- Summary: Post-completion hardening added ADR for the CompatIR owner decision and stream fixtures for tool-only stable ordering, reasoning summary spacing, and parallel tool indexes; focused and full service/relay regression passed
+- Verifier: codex

@@ -85,3 +85,24 @@
 - task4-stream-compatir-tests
 - Blocked on: none
 - Next step: Run full service/relay regression and lingering mapping check
+
+## DriftCheckDraft
+
+- Scope status: Post-completion hardening stayed inside ADR memory and CompatIR stream tests
+- Compatibility status: No runtime behavior changes; tests only lock existing stream semantics
+- Retirement status: ADR records service/compatir as canonical owner and documents retired wrapper/relay semantic owners
+- New risk signals:
+- none
+- Advisory decision: continue
+
+## Checkpoint Update
+
+- Current todo: Follow-up hardening complete
+- Active slice: ADR record and stream fixture expansion
+- Completed todos:
+- Created ADR for Responses <-> Chat CompatIR owner boundary
+- Added stream tests for tool-only stable ordering, reasoning summary section separation, and parallel function-call indexes
+- Evidence refs:
+- task6-adr-stream-fixtures
+- Blocked on: none
+- Next step: Push follow-up commit and rebuild GHCR image if desired

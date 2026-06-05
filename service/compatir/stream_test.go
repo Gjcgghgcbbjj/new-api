@@ -87,6 +87,74 @@ func TestCompatIRChatStreamToResponsesPreservesTextAndToolCalls(t *testing.T) {
 	}
 }
 
+func TestCompatIRChatStreamToResponsesToolOnlyKeepsStableToolOrder(t *testing.T) {
+	converter := NewChatToResponsesStreamConverter(ChatToResponsesStreamOptions{
+		ResponseID: "resp_1",
+		MessageID:  "msg_1",
+		Model:      "chat-model",
+		CreatedAt:  123,
+	})
+
+	first := 1
+	second := 0
+	converter.EventsFromChatChunk(&dto.ChatCompletionsStreamResponse{
+		Choices: []dto.ChatCompletionsStreamResponseChoice{
+			{
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+					ToolCalls: []dto.ToolCallResponse{
+						{
+							Index: &first,
+							ID:    "call_b",
+							Type:  ToolTypeFunction,
+							Function: dto.FunctionResponse{
+								Name:      "second_tool",
+								Arguments: `{"b":1}`,
+							},
+						},
+						{
+							Index: &second,
+							ID:    "call_a",
+							Type:  ToolTypeFunction,
+							Function: dto.FunctionResponse{
+								Name:      "first_tool",
+								Arguments: `{"a":1}`,
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	finalEvents, _ := converter.FinalEvents()
+	assertEventTypes(t, finalEvents,
+		"response.created",
+		"response.output_item.added",
+		"response.content_part.added",
+		"response.output_text.done",
+		"response.content_part.done",
+		"response.output_item.done",
+		"response.output_item.added",
+		"response.output_item.done",
+		"response.output_item.added",
+		"response.output_item.done",
+		"response.completed",
+	)
+
+	firstTool := payloadMap(t, finalEvents[6].Payload, "item")
+	secondTool := payloadMap(t, finalEvents[8].Payload, "item")
+	if firstTool["call_id"] != "call_a" || firstTool["name"] != "first_tool" {
+		t.Fatalf("first tool event = %+v", firstTool)
+	}
+	if secondTool["call_id"] != "call_b" || secondTool["name"] != "second_tool" {
+		t.Fatalf("second tool event = %+v", secondTool)
+	}
+	completed := payloadMap(t, finalEvents[10].Payload, "response")
+	if completed["output_text"] != "" {
+		t.Fatalf("completed response = %+v", completed)
+	}
+}
+
 func TestCompatIRResponsesStreamToChatPreservesTextAndToolDeltas(t *testing.T) {
 	converter := NewResponsesToChatStreamConverter(ResponsesToChatStreamOptions{
 		ResponseID: "chat_1",
@@ -149,6 +217,90 @@ func TestCompatIRResponsesStreamToChatPreservesTextAndToolDeltas(t *testing.T) {
 	usage := converter.Usage()
 	if usage == nil || usage.PromptTokens != 2 || usage.CompletionTokens != 3 || usage.TotalTokens != 5 {
 		t.Fatalf("usage = %+v", usage)
+	}
+}
+
+func TestCompatIRResponsesStreamReasoningSummaryAddsSeparatorBetweenSections(t *testing.T) {
+	converter := NewResponsesToChatStreamConverter(ResponsesToChatStreamOptions{
+		ResponseID: "chat_1",
+		Model:      "responses-model",
+		CreatedAt:  123,
+	})
+
+	chunks := converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type:  "response.reasoning_summary_text.delta",
+		Delta: "first",
+	})
+	if len(chunks) != 2 || chunks[1].Choices[0].Delta.GetReasoningContent() != "first" {
+		t.Fatalf("first summary chunks = %+v", chunks)
+	}
+	converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type: "response.reasoning_summary_text.done",
+	})
+	chunks = converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type:  "response.reasoning_summary_text.delta",
+		Delta: "second",
+	})
+	if len(chunks) != 1 || chunks[0].Choices[0].Delta.GetReasoningContent() != "\n\nsecond" {
+		t.Fatalf("second summary chunks = %+v", chunks)
+	}
+	if converter.UsageText() != "first\n\nsecond" {
+		t.Fatalf("usage text = %q", converter.UsageText())
+	}
+}
+
+func TestCompatIRResponsesStreamParallelFunctionCallsKeepDistinctIndexes(t *testing.T) {
+	converter := NewResponsesToChatStreamConverter(ResponsesToChatStreamOptions{
+		ResponseID: "chat_1",
+		Model:      "responses-model",
+		CreatedAt:  123,
+	})
+
+	chunks := converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type: "response.output_item.added",
+		Item: &dto.ResponsesOutput{
+			ID:     "fc_a",
+			Type:   OutputTypeFunctionCall,
+			CallId: "call_a",
+			Name:   "first_tool",
+		},
+	})
+	if len(chunks) != 2 {
+		t.Fatalf("first tool chunks = %+v", chunks)
+	}
+	firstTool := chunks[1].Choices[0].Delta.ToolCalls[0]
+	if firstTool.Index == nil || *firstTool.Index != 0 || firstTool.ID != "call_a" || firstTool.Function.Name != "first_tool" {
+		t.Fatalf("first tool = %+v", firstTool)
+	}
+
+	chunks = converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type: "response.output_item.added",
+		Item: &dto.ResponsesOutput{
+			ID:     "fc_b",
+			Type:   OutputTypeFunctionCall,
+			CallId: "call_b",
+			Name:   "second_tool",
+		},
+	})
+	if len(chunks) != 1 {
+		t.Fatalf("second tool chunks = %+v", chunks)
+	}
+	secondTool := chunks[0].Choices[0].Delta.ToolCalls[0]
+	if secondTool.Index == nil || *secondTool.Index != 1 || secondTool.ID != "call_b" || secondTool.Function.Name != "second_tool" {
+		t.Fatalf("second tool = %+v", secondTool)
+	}
+
+	chunks = converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type:   "response.function_call_arguments.delta",
+		ItemID: "fc_a",
+		Delta:  `{"a":1}`,
+	})
+	if len(chunks) != 1 {
+		t.Fatalf("first args chunks = %+v", chunks)
+	}
+	firstArgs := chunks[0].Choices[0].Delta.ToolCalls[0]
+	if firstArgs.Index == nil || *firstArgs.Index != 0 || firstArgs.ID != "call_a" || firstArgs.Function.Arguments != `{"a":1}` {
+		t.Fatalf("first args = %+v", firstArgs)
 	}
 }
 
