@@ -17,3 +17,4 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/drift-check-draft.json | Responses Chat CompatIR drift check draft |
 | 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/evidence-bundle-draft-task1-compatir-core-tests.json | 2026-06-05-responses-chat-compatir evidence task1-compatir-core-tests |
 | 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/resume-state-hint.json | 2026-06-05-responses-chat-compatir resume state hint |
+| 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/evidence-bundle-draft-task2-request-compatir-tests.json | 2026-06-05-responses-chat-compatir evidence task2-request-compatir-tests |

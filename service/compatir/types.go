@@ -34,6 +34,7 @@ type Request struct {
 	User                 json.RawMessage
 	Metadata             json.RawMessage
 	Store                json.RawMessage
+	Text                 json.RawMessage
 	PromptCacheKey       string
 	PromptCacheRetention json.RawMessage
 	Reasoning            *dto.Reasoning

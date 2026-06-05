@@ -25,3 +25,23 @@
 - task1-compatir-core-tests
 - Blocked on: none
 - Next step: Write request conversion tests in service/compatir
+
+## DriftCheckDraft
+
+- Scope status: Task 2 stayed inside Responses <-> Chat request conversion
+- Compatibility status: Public wrappers and relay tests remained compatible
+- Retirement status: Chat->Responses request direct mapper retired; Responses->Chat request exported function is wrapper; response helpers remain for Task 3
+- New risk signals:
+- none
+- Advisory decision: continue
+
+## Checkpoint Update
+
+- Current todo: Task 3: migrate non-stream response conversion through CompatIR
+- Active slice: Non-stream response conversion IR tests and implementation
+- Completed todos:
+- Task 2: migrated Chat/Responses request conversion through CompatIR and retired request-only openaicompat mapping logic
+- Evidence refs:
+- task2-request-compatir-tests
+- Blocked on: none
+- Next step: Write response conversion tests in service/compatir

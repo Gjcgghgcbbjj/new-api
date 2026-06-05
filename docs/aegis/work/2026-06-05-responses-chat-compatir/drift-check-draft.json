@@ -5,9 +5,9 @@
   "baselineRefs": [
     "docs/aegis/plans/2026-06-05-responses-chat-compatir.md"
   ],
-  "scopeStatus": "Task 1 stayed inside core types only",
-  "compatStatus": "No runtime conversion behavior changed",
-  "retirementStatus": "Old pairwise converters still active; retirement begins Task 2",
+  "scopeStatus": "Task 2 stayed inside Responses <-> Chat request conversion",
+  "compatStatus": "Public wrappers and relay tests remained compatible",
+  "retirementStatus": "Chat->Responses request direct mapper retired; Responses->Chat request exported function is wrapper; response helpers remain for Task 3",
   "newRiskSignals": [],
   "decision": "continue"
 }

@@ -9,58 +9,15 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
-	"github.com/samber/lo"
+	"github.com/QuantumNous/new-api/service/compatir"
 )
 
 func ResponsesRequestToChatCompletionsRequest(req *dto.OpenAIResponsesRequest) (*dto.GeneralOpenAIRequest, error) {
-	if req == nil {
-		return nil, errors.New("request is nil")
-	}
-	if req.Model == "" {
-		return nil, errors.New("model is required")
-	}
-
-	messages, err := responsesInputToChatMessages(req.Input)
+	ir, err := compatir.FromResponsesRequest(req)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(req.Instructions) > 0 && string(req.Instructions) != "null" {
-		instructions := strings.TrimSpace(common.JsonRawMessageToString(req.Instructions))
-		if instructions != "" {
-			messages = append([]dto.Message{{
-				Role:    "system",
-				Content: instructions,
-			}}, messages...)
-		}
-	}
-
-	stream := lo.FromPtrOr(req.Stream, false)
-	out := &dto.GeneralOpenAIRequest{
-		Model:                req.Model,
-		Messages:             messages,
-		Stream:               &stream,
-		StreamOptions:        req.StreamOptions,
-		MaxTokens:            req.MaxOutputTokens,
-		Temperature:          req.Temperature,
-		TopP:                 req.TopP,
-		User:                 req.User,
-		Metadata:             req.Metadata,
-		Store:                req.Store,
-		PromptCacheKey:       common.JsonRawMessageToString(req.PromptCacheKey),
-		Reasoning:            responsesReasoningToChatReasoning(req.Reasoning),
-		ReasoningEffort:      responsesReasoningEffort(req.Reasoning),
-		ParallelTooCalls:     rawBoolPtr(req.ParallelToolCalls),
-		PromptCacheRetention: req.PromptCacheRetention,
-	}
-
-	if len(req.Tools) > 0 {
-		out.Tools = responsesToolsToChatTools(req.Tools)
-	}
-	if len(req.ToolChoice) > 0 && string(req.ToolChoice) != "null" {
-		out.ToolChoice = responsesToolChoiceToChatToolChoice(req.ToolChoice)
-	}
-	return out, nil
+	return compatir.ToChatRequest(ir)
 }
 
 func ChatCompletionsResponseToResponsesResponse(resp *dto.OpenAITextResponse, original *dto.OpenAIResponsesRequest, id string) (*dto.OpenAIResponsesResponse, *dto.Usage, error) {
@@ -111,156 +68,6 @@ func ChatCompletionsResponseToResponsesResponse(resp *dto.OpenAITextResponse, or
 		}
 	}
 	return out, usage, nil
-}
-
-func responsesInputToChatMessages(input json.RawMessage) ([]dto.Message, error) {
-	if len(input) == 0 || string(input) == "null" {
-		return []dto.Message{{Role: "user", Content: ""}}, nil
-	}
-	switch common.GetJsonType(input) {
-	case "string":
-		var text string
-		if err := common.Unmarshal(input, &text); err != nil {
-			return nil, err
-		}
-		return []dto.Message{{Role: "user", Content: text}}, nil
-	case "array":
-		var items []map[string]any
-		if err := common.Unmarshal(input, &items); err != nil {
-			return nil, err
-		}
-		messages := make([]dto.Message, 0, len(items))
-		for _, item := range items {
-			messages = append(messages, responseInputItemToChatMessages(item)...)
-		}
-		if len(messages) == 0 {
-			messages = append(messages, dto.Message{Role: "user", Content: ""})
-		}
-		return messages, nil
-	default:
-		return []dto.Message{{Role: "user", Content: common.JsonRawMessageToString(input)}}, nil
-	}
-}
-
-func responseInputItemToChatMessages(item map[string]any) []dto.Message {
-	itemType := common.Interface2String(item["type"])
-	switch itemType {
-	case "function_call_output":
-		return []dto.Message{{
-			Role:       "tool",
-			ToolCallId: common.Interface2String(item["call_id"]),
-			Content:    interfaceToText(item["output"]),
-		}}
-	case "function_call":
-		msg := dto.Message{
-			Role:    "assistant",
-			Content: "",
-		}
-		msg.SetToolCalls([]dto.ToolCallRequest{{
-			ID:   common.Interface2String(firstNonEmpty(item["call_id"], item["id"])),
-			Type: "function",
-			Function: dto.FunctionRequest{
-				Name:      common.Interface2String(item["name"]),
-				Arguments: interfaceToText(item["arguments"]),
-			},
-		}})
-		return []dto.Message{msg}
-	}
-
-	role := common.Interface2String(item["role"])
-	if role == "" {
-		role = "user"
-	}
-	if itemType == "message" || item["content"] != nil {
-		return []dto.Message{{
-			Role:    role,
-			Content: responsesContentToChatContent(role, item["content"]),
-		}}
-	}
-	return []dto.Message{{Role: role, Content: interfaceToText(item)}}
-}
-
-func responsesContentToChatContent(role string, content any) any {
-	switch v := content.(type) {
-	case nil:
-		return ""
-	case string:
-		return v
-	case []any:
-		parts := make([]dto.MediaContent, 0, len(v))
-		var textOnly strings.Builder
-		allText := true
-		for _, itemAny := range v {
-			item, ok := itemAny.(map[string]any)
-			if !ok {
-				continue
-			}
-			switch common.Interface2String(item["type"]) {
-			case "input_text", "output_text", "text":
-				text := common.Interface2String(item["text"])
-				textOnly.WriteString(text)
-				parts = append(parts, dto.MediaContent{Type: dto.ContentTypeText, Text: text})
-			case "input_image":
-				allText = false
-				parts = append(parts, dto.MediaContent{Type: dto.ContentTypeImageURL, ImageUrl: item["image_url"]})
-			case "input_audio":
-				allText = false
-				parts = append(parts, dto.MediaContent{Type: dto.ContentTypeInputAudio, InputAudio: item["input_audio"]})
-			case "input_file":
-				allText = false
-				parts = append(parts, dto.MediaContent{Type: dto.ContentTypeFile, File: item["file"]})
-			}
-		}
-		if allText {
-			return textOnly.String()
-		}
-		return parts
-	default:
-		return interfaceToText(v)
-	}
-}
-
-func responsesToolsToChatTools(raw json.RawMessage) []dto.ToolCallRequest {
-	var tools []map[string]any
-	if err := common.Unmarshal(raw, &tools); err != nil {
-		return nil
-	}
-	out := make([]dto.ToolCallRequest, 0, len(tools))
-	for _, tool := range tools {
-		if common.Interface2String(tool["type"]) != "function" {
-			continue
-		}
-		out = append(out, dto.ToolCallRequest{
-			Type: "function",
-			Function: dto.FunctionRequest{
-				Name:        common.Interface2String(firstNonEmpty(tool["name"], nestedValue(tool, "function", "name"))),
-				Description: common.Interface2String(firstNonEmpty(tool["description"], nestedValue(tool, "function", "description"))),
-				Parameters:  firstNonNil(tool["parameters"], nestedValue(tool, "function", "parameters")),
-			},
-		})
-	}
-	return out
-}
-
-func responsesToolChoiceToChatToolChoice(raw json.RawMessage) any {
-	if common.GetJsonType(raw) == "string" {
-		var choice string
-		_ = common.Unmarshal(raw, &choice)
-		return choice
-	}
-	var choice map[string]any
-	if err := common.Unmarshal(raw, &choice); err != nil {
-		return raw
-	}
-	if common.Interface2String(choice["type"]) == "function" && common.Interface2String(choice["name"]) != "" {
-		return map[string]any{
-			"type": "function",
-			"function": map[string]any{
-				"name": common.Interface2String(choice["name"]),
-			},
-		}
-	}
-	return choice
 }
 
 func chatMessageToResponsesOutput(resp *dto.OpenAITextResponse) ([]dto.ResponsesOutput, string) {
@@ -327,32 +134,6 @@ func chatUsageToResponsesUsage(usage *dto.Usage) *dto.Usage {
 	return &out
 }
 
-func responsesReasoningEffort(reasoning *dto.Reasoning) string {
-	if reasoning == nil {
-		return ""
-	}
-	return reasoning.Effort
-}
-
-func responsesReasoningToChatReasoning(reasoning *dto.Reasoning) json.RawMessage {
-	if reasoning == nil {
-		return nil
-	}
-	raw, _ := common.Marshal(reasoning)
-	return raw
-}
-
-func rawBoolPtr(raw json.RawMessage) *bool {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil
-	}
-	var value bool
-	if err := common.Unmarshal(raw, &value); err != nil {
-		return nil
-	}
-	return &value
-}
-
 func normalizeCreatedAt(v any) int {
 	switch n := v.(type) {
 	case int:
@@ -367,44 +148,4 @@ func normalizeCreatedAt(v any) int {
 	default:
 		return 0
 	}
-}
-
-func interfaceToText(v any) string {
-	if v == nil {
-		return ""
-	}
-	if s, ok := v.(string); ok {
-		return s
-	}
-	b, err := common.Marshal(v)
-	if err != nil {
-		return fmt.Sprintf("%v", v)
-	}
-	return string(b)
-}
-
-func firstNonEmpty(values ...any) any {
-	for _, value := range values {
-		if common.Interface2String(value) != "" {
-			return value
-		}
-	}
-	return nil
-}
-
-func firstNonNil(values ...any) any {
-	for _, value := range values {
-		if value != nil {
-			return value
-		}
-	}
-	return nil
-}
-
-func nestedValue(m map[string]any, key string, nested string) any {
-	child, ok := m[key].(map[string]any)
-	if !ok {
-		return nil
-	}
-	return child[nested]
 }

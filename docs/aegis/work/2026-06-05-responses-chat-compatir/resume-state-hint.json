@@ -2,9 +2,9 @@
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-06-05-responses-chat-compatir",
   "lastCheckpointRef": "docs/aegis/work/2026-06-05-responses-chat-compatir/todo-checkpoint-draft.json",
-  "resumeInstruction": "Resume from docs/aegis/plans/2026-06-05-responses-chat-compatir.md Task 2; worktree is .worktrees/responses-chat-compatir",
+  "resumeInstruction": "Resume from docs/aegis/plans/2026-06-05-responses-chat-compatir.md Task 3 in .worktrees/responses-chat-compatir",
   "knownPartialWork": [
-    "Task 1: added CompatIR core types, warnings, stable tool ordering, and tests"
+    "Task 2: migrated Chat/Responses request conversion through CompatIR and retired request-only openaicompat mapping logic"
   ],
   "mustReadBeforeContinuing": [
     "docs/aegis/work/2026-06-05-responses-chat-compatir/10-intent.md",
@@ -12,6 +12,6 @@
     "docs/aegis/work/2026-06-05-responses-chat-compatir/todo-checkpoint-draft.json"
   ],
   "unsafeToAssume": [
-    "Do not include Claude/Gemini or stream conversion in Task 2"
+    "Do not touch stream conversion until Task 4"
   ]
 }
