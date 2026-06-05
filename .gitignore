@@ -26,6 +26,8 @@ tiktoken_cache
 .cache
 .npm-cache
 plans
+!docs/aegis/plans/
+!docs/aegis/plans/**
 .claude
 .cursor
 
