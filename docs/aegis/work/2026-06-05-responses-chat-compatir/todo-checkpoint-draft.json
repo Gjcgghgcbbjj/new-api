@@ -1,15 +1,15 @@
 {
   "schemaVersion": "aegis.schema.v0",
   "taskId": "2026-06-05-responses-chat-compatir",
-  "currentTodo": "Task 3: migrate non-stream response conversion through CompatIR",
+  "currentTodo": "Task 4: migrate stream event conversion through CompatIR",
   "completedTodos": [
-    "Task 2: migrated Chat/Responses request conversion through CompatIR and retired request-only openaicompat mapping logic"
+    "Task 3: migrated non-stream response conversion through CompatIR and retired openaicompat response mapping helpers"
   ],
-  "activeSlice": "Non-stream response conversion IR tests and implementation",
+  "activeSlice": "Stream event semantic conversion extraction",
   "evidenceRefs": [
-    "task2-request-compatir-tests"
+    "task3-response-compatir-tests"
   ],
   "blockedOn": null,
-  "nextStep": "Write response conversion tests in service/compatir",
+  "nextStep": "Write service/compatir stream event tests",
   "updatedAt": "2026-06-05"
 }

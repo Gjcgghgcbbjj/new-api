@@ -5,9 +5,9 @@
   "baselineRefs": [
     "docs/aegis/plans/2026-06-05-responses-chat-compatir.md"
   ],
-  "scopeStatus": "Task 2 stayed inside Responses <-> Chat request conversion",
-  "compatStatus": "Public wrappers and relay tests remained compatible",
-  "retirementStatus": "Chat->Responses request direct mapper retired; Responses->Chat request exported function is wrapper; response helpers remain for Task 3",
+  "scopeStatus": "Task 3 stayed inside non-stream Responses <-> Chat response conversion",
+  "compatStatus": "Existing wrappers and relay response tests passed",
+  "retirementStatus": "Non-stream response mapping logic retired from openaicompat; stream semantic mapping remains for Task 4",
   "newRiskSignals": [],
   "decision": "continue"
 }

@@ -45,3 +45,23 @@
 - task2-request-compatir-tests
 - Blocked on: none
 - Next step: Write response conversion tests in service/compatir
+
+## DriftCheckDraft
+
+- Scope status: Task 3 stayed inside non-stream Responses <-> Chat response conversion
+- Compatibility status: Existing wrappers and relay response tests passed
+- Retirement status: Non-stream response mapping logic retired from openaicompat; stream semantic mapping remains for Task 4
+- New risk signals:
+- none
+- Advisory decision: continue
+
+## Checkpoint Update
+
+- Current todo: Task 4: migrate stream event conversion through CompatIR
+- Active slice: Stream event semantic conversion extraction
+- Completed todos:
+- Task 3: migrated non-stream response conversion through CompatIR and retired openaicompat response mapping helpers
+- Evidence refs:
+- task3-response-compatir-tests
+- Blocked on: none
+- Next step: Write service/compatir stream event tests
