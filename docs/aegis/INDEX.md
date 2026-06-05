@@ -19,3 +19,4 @@ Entries are workspace records, not authoritative runtime decisions.
 | 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/resume-state-hint.json | 2026-06-05-responses-chat-compatir resume state hint |
 | 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/evidence-bundle-draft-task2-request-compatir-tests.json | 2026-06-05-responses-chat-compatir evidence task2-request-compatir-tests |
 | 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/evidence-bundle-draft-task3-response-compatir-tests.json | 2026-06-05-responses-chat-compatir evidence task3-response-compatir-tests |
+| 2026-06-05 | artifact | docs/aegis/work/2026-06-05-responses-chat-compatir/evidence-bundle-draft-task4-stream-compatir-tests.json | 2026-06-05-responses-chat-compatir evidence task4-stream-compatir-tests |

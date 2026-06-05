@@ -65,3 +65,23 @@
 - task3-response-compatir-tests
 - Blocked on: none
 - Next step: Write service/compatir stream event tests
+
+## DriftCheckDraft
+
+- Scope status: Task 4 stayed inside stream event semantic conversion
+- Compatibility status: SSE event names, payload shapes, and relay stream IO ownership remained unchanged
+- Retirement status: Handler-local stream text/tool/usage conversion branches retired; service/compatir owns stream event semantics
+- New risk signals:
+- none
+- Advisory decision: continue
+
+## Checkpoint Update
+
+- Current todo: Task 5: final regression, push, and image build
+- Active slice: Full service/relay verification and publish
+- Completed todos:
+- Task 4: migrated Chat/Responses stream conversion through CompatIR and retired relay-local semantic mapping branches
+- Evidence refs:
+- task4-stream-compatir-tests
+- Blocked on: none
+- Next step: Run full service/relay regression and lingering mapping check

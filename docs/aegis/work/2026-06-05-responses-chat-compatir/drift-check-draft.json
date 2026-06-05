@@ -5,9 +5,9 @@
   "baselineRefs": [
     "docs/aegis/plans/2026-06-05-responses-chat-compatir.md"
   ],
-  "scopeStatus": "Task 3 stayed inside non-stream Responses <-> Chat response conversion",
-  "compatStatus": "Existing wrappers and relay response tests passed",
-  "retirementStatus": "Non-stream response mapping logic retired from openaicompat; stream semantic mapping remains for Task 4",
+  "scopeStatus": "Task 4 stayed inside stream event semantic conversion",
+  "compatStatus": "SSE event names, payload shapes, and relay stream IO ownership remained unchanged",
+  "retirementStatus": "Handler-local stream text/tool/usage conversion branches retired; service/compatir owns stream event semantics",
   "newRiskSignals": [],
   "decision": "continue"
 }
