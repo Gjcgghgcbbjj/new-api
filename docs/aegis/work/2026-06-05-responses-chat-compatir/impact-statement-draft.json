@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "affectedLayers": [
+    "service",
+    "relay"
+  ],
+  "owners": [
+    "service/compatir"
+  ],
+  "invariants": [
+    "public API JSON, routing, quota, and pricing behavior remain unchanged"
+  ],
+  "compatBoundary": "no Claude/Gemini, database, quota, or route behavior changes",
+  "nonGoals": [
+    "Claude/Gemini IR migration",
+    "database or pricing changes"
+  ]
+}

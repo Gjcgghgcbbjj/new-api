@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-06-05-responses-chat-compatir",
+  "taskIntentRef": "docs/aegis/work/2026-06-05-responses-chat-compatir/task-intent-draft.json",
+  "baselineRefs": [
+    "docs/aegis/plans/2026-06-05-responses-chat-compatir.md"
+  ],
+  "scopeStatus": "Task 1 stayed inside core types only",
+  "compatStatus": "No runtime conversion behavior changed",
+  "retirementStatus": "Old pairwise converters still active; retirement begins Task 2",
+  "newRiskSignals": [],
+  "decision": "continue"
+}

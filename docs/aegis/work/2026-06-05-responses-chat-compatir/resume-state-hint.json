@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-06-05-responses-chat-compatir",
+  "lastCheckpointRef": "docs/aegis/work/2026-06-05-responses-chat-compatir/todo-checkpoint-draft.json",
+  "resumeInstruction": "Resume from docs/aegis/plans/2026-06-05-responses-chat-compatir.md Task 2; worktree is .worktrees/responses-chat-compatir",
+  "knownPartialWork": [
+    "Task 1: added CompatIR core types, warnings, stable tool ordering, and tests"
+  ],
+  "mustReadBeforeContinuing": [
+    "docs/aegis/work/2026-06-05-responses-chat-compatir/10-intent.md",
+    "docs/aegis/work/2026-06-05-responses-chat-compatir/20-checkpoint.md",
+    "docs/aegis/work/2026-06-05-responses-chat-compatir/todo-checkpoint-draft.json"
+  ],
+  "unsafeToAssume": [
+    "Do not include Claude/Gemini or stream conversion in Task 2"
+  ]
+}

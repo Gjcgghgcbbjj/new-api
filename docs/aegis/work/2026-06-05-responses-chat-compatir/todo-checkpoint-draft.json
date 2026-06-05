@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-06-05-responses-chat-compatir",
+  "currentTodo": "Task 2: migrate request conversion through CompatIR",
+  "completedTodos": [
+    "Task 1: added CompatIR core types, warnings, stable tool ordering, and tests"
+  ],
+  "activeSlice": "Request conversion IR tests and implementation",
+  "evidenceRefs": [
+    "task1-compatir-core-tests"
+  ],
+  "blockedOn": null,
+  "nextStep": "Write request conversion tests in service/compatir",
+  "updatedAt": "2026-06-05"
+}
