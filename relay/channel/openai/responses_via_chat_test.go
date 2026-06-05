@@ -3,6 +3,7 @@ package openai
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -113,4 +115,97 @@ func readSSEEventLine(r io.Reader, timeout time.Duration) (string, error) {
 	case <-time.After(timeout):
 		return "", fmt.Errorf("timeout waiting for SSE event")
 	}
+}
+
+func TestOaiResponsesToChatStreamHandlerPreservesTextAndToolCallDeltas(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set(common.RequestIdKey, "responses-to-chat-mixed")
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	stream := strings.Join([]string{
+		`data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":123,"status":"in_progress","model":"responses-model","output":[]}}`,
+		`data: {"type":"response.output_text.delta","delta":"Let me check."}`,
+		`data: {"type":"response.output_item.done","item":{"id":"fc_1","type":"function_call","status":"completed","call_id":"call_1","name":"get_weather","arguments":{"city":"Shanghai"}}}`,
+		`data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":123,"status":"completed","model":"responses-model","output":[],"usage":{"input_tokens":2,"output_tokens":3,"total_tokens":5}}}`,
+		`data: [DONE]`,
+		``,
+	}, "\n\n")
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(stream)),
+	}
+
+	usage, apiErr := OaiResponsesToChatStreamHandler(ctx, &relaycommon.RelayInfo{
+		RelayFormat:        types.RelayFormatOpenAI,
+		ShouldIncludeUsage: true,
+		ChannelMeta:        &relaycommon.ChannelMeta{UpstreamModelName: "responses-model"},
+	}, resp)
+	if apiErr != nil {
+		t.Fatalf("unexpected error: %v", apiErr)
+	}
+	if usage == nil || usage.InputTokens != 2 || usage.OutputTokens != 3 || usage.TotalTokens != 5 {
+		t.Fatalf("usage = %+v", usage)
+	}
+
+	chunks := parseChatStreamChunks(t, recorder.Body.String())
+	var sawText bool
+	var sawToolCall bool
+	var finishReason string
+	for _, chunk := range chunks {
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		choice := chunk.Choices[0]
+		if choice.Delta.GetContentString() == "Let me check." {
+			sawText = true
+		}
+		if len(choice.Delta.ToolCalls) > 0 {
+			sawToolCall = true
+			tool := choice.Delta.ToolCalls[0]
+			if tool.ID != "call_1" || tool.Function.Name != "get_weather" || tool.Function.Arguments != `{"city":"Shanghai"}` {
+				t.Fatalf("tool call delta = %+v", tool)
+			}
+		}
+		if choice.FinishReason != nil {
+			finishReason = *choice.FinishReason
+		}
+	}
+	if !sawText {
+		t.Fatalf("expected text delta in stream, got body:\n%s", recorder.Body.String())
+	}
+	if !sawToolCall {
+		t.Fatalf("expected tool call delta in stream, got body:\n%s", recorder.Body.String())
+	}
+	if finishReason != "tool_calls" {
+		t.Fatalf("finish reason = %q", finishReason)
+	}
+}
+
+func parseChatStreamChunks(t *testing.T, body string) []dto.ChatCompletionsStreamResponse {
+	t.Helper()
+	var chunks []dto.ChatCompletionsStreamResponse
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data: "))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		var chunk dto.ChatCompletionsStreamResponse
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			t.Fatalf("unmarshal stream chunk %q: %v", data, err)
+		}
+		chunks = append(chunks, chunk)
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return chunks
 }

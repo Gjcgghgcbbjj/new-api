@@ -88,3 +88,56 @@ func TestChatCompletionsResponseToResponsesResponse(t *testing.T) {
 		t.Fatalf("usage = %+v", usage)
 	}
 }
+
+func TestResponsesResponseToChatCompletionsResponsePreservesTextAndToolCalls(t *testing.T) {
+	resp := &dto.OpenAIResponsesResponse{
+		ID:        "resp_1",
+		Object:    "response",
+		CreatedAt: 123,
+		Model:     "responses-model",
+		Output: []dto.ResponsesOutput{
+			{
+				Type:   "message",
+				ID:     "msg_1",
+				Status: "completed",
+				Role:   "assistant",
+				Content: []dto.ResponsesOutputContent{
+					{
+						Type: "output_text",
+						Text: "Let me check.",
+					},
+				},
+			},
+			{
+				Type:      "function_call",
+				ID:        "fc_1",
+				Status:    "completed",
+				CallId:    "call_1",
+				Name:      "get_weather",
+				Arguments: json.RawMessage(`{"city":"Shanghai"}`),
+			},
+		},
+	}
+
+	chatResp, _, err := ResponsesResponseToChatCompletionsResponse(resp, "chat_1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(chatResp.Choices) != 1 {
+		t.Fatalf("choices = %+v", chatResp.Choices)
+	}
+	choice := chatResp.Choices[0]
+	if choice.FinishReason != "tool_calls" {
+		t.Fatalf("finish_reason = %q", choice.FinishReason)
+	}
+	if choice.Message.StringContent() != "Let me check." {
+		t.Fatalf("content = %q", choice.Message.StringContent())
+	}
+	toolCalls := choice.Message.ParseToolCalls()
+	if len(toolCalls) != 1 {
+		t.Fatalf("tool calls = %+v", toolCalls)
+	}
+	if toolCalls[0].ID != "call_1" || toolCalls[0].Function.Name != "get_weather" || toolCalls[0].Function.Arguments != `{"city":"Shanghai"}` {
+		t.Fatalf("tool call = %+v", toolCalls[0])
+	}
+}
