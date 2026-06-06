@@ -34,6 +34,7 @@ export const useModelsData = () => {
   const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   const [searching, setSearching] = useState(false);
   const [modelCount, setModelCount] = useState(0);
+  const [perfMap, setPerfMap] = useState({});
 
   // Modal states
   const [showEdit, setShowEdit] = useState(false);
@@ -88,6 +89,35 @@ export const useModelsData = () => {
     setModels(models);
   };
 
+  const loadModelPerfSummary = async (modelList) => {
+    const modelNames = (modelList || [])
+      .map((model) => model?.model_name)
+      .filter(Boolean);
+
+    if (modelNames.length === 0) {
+      setPerfMap({});
+      return;
+    }
+
+    try {
+      const res = await API.post(
+        '/api/models/perf-summary',
+        { models: modelNames, hours: 24 },
+        { skipErrorHandler: true },
+      );
+      const items = res.data?.data?.models || [];
+      const nextMap = {};
+      for (const item of items) {
+        if (item?.model_name) {
+          nextMap[item.model_name] = item;
+        }
+      }
+      setPerfMap(nextMap);
+    } catch (_) {
+      setPerfMap({});
+    }
+  };
+
   // Vendor list
   const [vendors, setVendors] = useState([]);
   const [vendorCounts, setVendorCounts] = useState({});
@@ -140,6 +170,7 @@ export const useModelsData = () => {
         setActivePage(data.page || page);
         setModelCount(data.total || newPageData.length);
         setModelFormat(newPageData);
+        await loadModelPerfSummary(newPageData);
 
         if (data.vendor_counts) {
           const sumAll = Object.values(data.vendor_counts).reduce(
@@ -151,11 +182,13 @@ export const useModelsData = () => {
       } else {
         showError(message);
         setModels([]);
+        setPerfMap({});
       }
     } catch (error) {
       console.error(error);
       showError(t('获取模型列表失败'));
       setModels([]);
+      setPerfMap({});
     }
     setLoading(false);
   };
@@ -271,6 +304,7 @@ export const useModelsData = () => {
         setActivePage(data.page || 1);
         setModelCount(data.total || newPageData.length);
         setModelFormat(newPageData);
+        await loadModelPerfSummary(newPageData);
         if (data.vendor_counts) {
           const sumAll = Object.values(data.vendor_counts).reduce(
             (acc, v) => acc + v,
@@ -281,11 +315,13 @@ export const useModelsData = () => {
       } else {
         showError(message);
         setModels([]);
+        setPerfMap({});
       }
     } catch (error) {
       console.error(error);
       showError(t('搜索模型失败'));
       setModels([]);
+      setPerfMap({});
     }
     setSearching(false);
   };
@@ -435,6 +471,7 @@ export const useModelsData = () => {
     activePage,
     pageSize,
     modelCount,
+    perfMap,
 
     // Selection state
     selectedKeys,
