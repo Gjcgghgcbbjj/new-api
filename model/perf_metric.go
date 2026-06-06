@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -68,6 +69,17 @@ type PerfMetricSummary struct {
 	GenerationMs   int64  `json:"generation_ms"`
 }
 
+type PerfMetricBucketSummary struct {
+	BucketTs       int64  `json:"ts" gorm:"column:bucket_ts"`
+	ModelName      string `json:"model_name"`
+	RequestCount   int64  `json:"request_count"`
+	SuccessCount   int64  `json:"success_count"`
+	TotalLatencyMs int64  `json:"total_latency_ms"`
+	OutputTokens   int64  `json:"output_tokens"`
+	GenerationMs   int64  `json:"generation_ms"`
+	LastSeen       int64  `json:"last_seen"`
+}
+
 func GetPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string, modelNames []string) ([]PerfMetricSummary, error) {
 	var summaries []PerfMetricSummary
 	if modelNames != nil {
@@ -95,6 +107,38 @@ func GetPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string, model
 	return summaries, err
 }
 
+func GetPerfMetricsBucketSummaryAll(startTs int64, endTs int64, bucketSeconds int64, groups []string, modelNames []string) ([]PerfMetricBucketSummary, error) {
+	var summaries []PerfMetricBucketSummary
+	if bucketSeconds <= 0 {
+		bucketSeconds = 3600
+	}
+	if modelNames != nil {
+		modelNames = normalizeLookupValues(modelNames)
+		if len(modelNames) == 0 {
+			return summaries, nil
+		}
+	}
+	bucketExpr := bucketExpression("bucket_ts", bucketSeconds)
+	query := DB.Model(&PerfMetric{}).
+		Select(bucketExpr+" as bucket_ts, model_name, SUM(request_count) as request_count, SUM(success_count) as success_count, SUM(total_latency_ms) as total_latency_ms, SUM(output_tokens) as output_tokens, SUM(generation_ms) as generation_ms, MAX(bucket_ts) as last_seen").
+		Where("bucket_ts >= ? AND bucket_ts <= ?", startTs, endTs)
+	if modelNames != nil {
+		query = query.Where("model_name IN ?", modelNames)
+	}
+	if groups != nil {
+		if len(groups) == 0 {
+			return summaries, nil
+		}
+		query = query.Where(commonGroupCol+" IN ?", groups)
+	}
+	err := query.
+		Group("model_name, " + bucketExpr).
+		Having("SUM(request_count) > 0").
+		Order("bucket_ts ASC").
+		Find(&summaries).Error
+	return summaries, err
+}
+
 func DeletePerfMetricsBefore(cutoffTs int64) error {
 	if cutoffTs <= 0 {
 		return nil
@@ -107,4 +151,8 @@ func PerfMetricStartTime(hours int) int64 {
 		hours = 24
 	}
 	return time.Now().Add(-time.Duration(hours) * time.Hour).Unix()
+}
+
+func bucketExpression(column string, bucketSeconds int64) string {
+	return column + " - (" + column + " % " + strconv.FormatInt(bucketSeconds, 10) + ")"
 }

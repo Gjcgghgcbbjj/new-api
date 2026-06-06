@@ -22,10 +22,27 @@ var logFallbackCache sync.Map
 // hiding fields or making response-only privacy hardening changes.
 const seriesSchema = "dbcd0a3c01b55203"
 const logFallbackCacheTTL = 60 * time.Second
+const healthHealthyRate = 99.9
+const healthWarningRate = 99.0
 
 type logFallbackCacheEntry struct {
 	expiresAt time.Time
 	rows      []model.PerfMetricSummary
+}
+
+type healthBucketModelKey struct {
+	ts    int64
+	model string
+}
+
+type healthBucketAggregate struct {
+	counters counters
+	lastSeen int64
+}
+
+type healthModelAggregate struct {
+	counters counters
+	lastSeen int64
 }
 
 func Init() {
@@ -142,6 +159,85 @@ func QuerySummaryForModels(hours int, groups []string, modelNames []string) (Sum
 	return querySummary(hours, groups, modelNames)
 }
 
+func QueryHealth(hours int, groups []string, modelNames []string) (HealthResult, error) {
+	if hours <= 0 {
+		hours = 24 * 30
+	}
+	if hours > 24*30 {
+		hours = 24 * 30
+	}
+	endTs := time.Now().Unix()
+	startTs := endTs - int64(hours)*3600
+	bucketSeconds := healthBucketSeconds(hours)
+	startBucket := alignBucket(startTs, bucketSeconds)
+	endBucket := alignBucket(endTs, bucketSeconds)
+
+	if modelNames != nil {
+		modelNames = normalizeStringList(modelNames)
+		if len(modelNames) == 0 {
+			return emptyHealthResult(hours, bucketSeconds, endTs), nil
+		}
+	}
+
+	allowedGroups := allowedGroupSet(groups)
+	allowedModels := allowedModelSet(modelNames)
+	bucketModels := map[healthBucketModelKey]healthBucketAggregate{}
+	metricKeys := map[healthBucketModelKey]struct{}{}
+
+	metricRows, err := model.GetPerfMetricsBucketSummaryAll(startTs, endTs, bucketSeconds, groups, modelNames)
+	if err != nil {
+		return HealthResult{}, err
+	}
+	for _, row := range metricRows {
+		key := healthBucketModelKey{ts: row.BucketTs, model: row.ModelName}
+		addHealthBucketAggregate(bucketModels, key, rowCounters(row), row.LastSeen)
+		metricKeys[key] = struct{}{}
+	}
+
+	hotBuckets.Range(func(key, value any) bool {
+		k := key.(bucketKey)
+		if k.bucketTs < startTs || k.bucketTs > endTs {
+			return true
+		}
+		if allowedModels != nil {
+			if _, ok := allowedModels[k.model]; !ok {
+				return true
+			}
+		}
+		if allowedGroups != nil {
+			if _, ok := allowedGroups[k.group]; !ok {
+				return true
+			}
+		}
+		snap := value.(*atomicBucket).snapshot()
+		if snap.requestCount == 0 {
+			return true
+		}
+		healthKey := healthBucketModelKey{
+			ts:    alignBucket(k.bucketTs, bucketSeconds),
+			model: k.model,
+		}
+		addHealthBucketAggregate(bucketModels, healthKey, snap, time.Now().Unix())
+		metricKeys[healthKey] = struct{}{}
+		return true
+	})
+
+	logRows, logErr := model.GetLogPerfMetricsBucketSummaryAll(startTs, endTs, bucketSeconds, groups, modelNames)
+	if logErr != nil {
+		common.SysError("failed to query log health history fallback: " + logErr.Error())
+	} else {
+		for _, row := range logRows {
+			key := healthBucketModelKey{ts: row.BucketTs, model: row.ModelName}
+			if _, ok := metricKeys[key]; ok {
+				continue
+			}
+			addHealthBucketAggregate(bucketModels, key, rowCounters(row), row.LastSeen)
+		}
+	}
+
+	return buildHealthResult(bucketModels, startBucket, endBucket, bucketSeconds, hours, endTs), nil
+}
+
 func querySummary(hours int, groups []string, modelNames []string) (SummaryAllResult, error) {
 	if hours <= 0 {
 		hours = 24
@@ -244,6 +340,212 @@ func querySummary(hours int, groups []string, modelNames []string) (SummaryAllRe
 	})
 
 	return SummaryAllResult{Models: models}, nil
+}
+
+func buildHealthResult(bucketModels map[healthBucketModelKey]healthBucketAggregate, startBucket int64, endBucket int64, bucketSeconds int64, hours int, generatedAt int64) HealthResult {
+	bucketTotals := map[int64]counters{}
+	bucketModelTotals := map[int64]map[string]counters{}
+	modelTotals := map[string]healthModelAggregate{}
+
+	for key, value := range bucketModels {
+		if value.counters.requestCount == 0 {
+			continue
+		}
+		curBucketTotal := bucketTotals[key.ts]
+		curBucketTotal.requestCount += value.counters.requestCount
+		curBucketTotal.successCount += value.counters.successCount
+		curBucketTotal.totalLatencyMs += value.counters.totalLatencyMs
+		curBucketTotal.outputTokens += value.counters.outputTokens
+		curBucketTotal.generationMs += value.counters.generationMs
+		bucketTotals[key.ts] = curBucketTotal
+
+		if _, ok := bucketModelTotals[key.ts]; !ok {
+			bucketModelTotals[key.ts] = map[string]counters{}
+		}
+		curModelBucket := bucketModelTotals[key.ts][key.model]
+		curModelBucket.requestCount += value.counters.requestCount
+		curModelBucket.successCount += value.counters.successCount
+		curModelBucket.totalLatencyMs += value.counters.totalLatencyMs
+		curModelBucket.outputTokens += value.counters.outputTokens
+		curModelBucket.generationMs += value.counters.generationMs
+		bucketModelTotals[key.ts][key.model] = curModelBucket
+
+		curModel := modelTotals[key.model]
+		curModel.counters.requestCount += value.counters.requestCount
+		curModel.counters.successCount += value.counters.successCount
+		curModel.counters.totalLatencyMs += value.counters.totalLatencyMs
+		curModel.counters.outputTokens += value.counters.outputTokens
+		curModel.counters.generationMs += value.counters.generationMs
+		if value.lastSeen > curModel.lastSeen {
+			curModel.lastSeen = value.lastSeen
+		}
+		modelTotals[key.model] = curModel
+	}
+
+	timestamps := healthTimestamps(startBucket, endBucket, bucketSeconds)
+	history := make([]HealthBucket, 0, len(timestamps))
+	totalCounters := counters{}
+	for _, ts := range timestamps {
+		bucketCounters := bucketTotals[ts]
+		totalCounters.requestCount += bucketCounters.requestCount
+		totalCounters.successCount += bucketCounters.successCount
+		totalCounters.totalLatencyMs += bucketCounters.totalLatencyMs
+		totalCounters.outputTokens += bucketCounters.outputTokens
+		totalCounters.generationMs += bucketCounters.generationMs
+		activeModels, downModels := bucketHealthCounts(bucketModelTotals[ts])
+		history = append(history, healthBucketFromCounters(ts, bucketCounters, activeModels, downModels))
+	}
+
+	models := make([]HealthModelSummary, 0, len(modelTotals))
+	for name, total := range modelTotals {
+		if total.counters.requestCount == 0 {
+			continue
+		}
+		trend := make([]HealthBucket, 0, len(timestamps))
+		for _, ts := range timestamps {
+			trend = append(trend, healthBucketFromCounters(ts, bucketModelTotals[ts][name], 0, 0))
+		}
+		models = append(models, HealthModelSummary{
+			ModelName:    name,
+			AvgLatencyMs: avg(total.counters.totalLatencyMs, total.counters.requestCount),
+			SuccessRate:  roundedRate(successRate(total.counters)),
+			AvgTps:       roundedRate(avgTps(total.counters)),
+			RequestCount: total.counters.requestCount,
+			SuccessCount: total.counters.successCount,
+			LastSeen:     total.lastSeen,
+			Trend:        trend,
+		})
+	}
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].RequestCount > models[j].RequestCount
+	})
+
+	return HealthResult{
+		Models:        models,
+		History:       history,
+		Totals:        healthTotals(models, totalCounters),
+		WindowHours:   hours,
+		BucketSeconds: bucketSeconds,
+		GeneratedAt:   generatedAt,
+	}
+}
+
+func emptyHealthResult(hours int, bucketSeconds int64, generatedAt int64) HealthResult {
+	return HealthResult{
+		Models:        []HealthModelSummary{},
+		History:       []HealthBucket{},
+		Totals:        HealthTotals{},
+		WindowHours:   hours,
+		BucketSeconds: bucketSeconds,
+		GeneratedAt:   generatedAt,
+	}
+}
+
+func healthTotals(models []HealthModelSummary, total counters) HealthTotals {
+	result := HealthTotals{
+		TotalModels:  len(models),
+		RequestCount: total.requestCount,
+		SuccessCount: total.successCount,
+		AvgLatencyMs: avg(total.totalLatencyMs, total.requestCount),
+		SuccessRate:  roundedRate(successRate(total)),
+		AvgTps:       roundedRate(avgTps(total)),
+	}
+	for _, item := range models {
+		if item.SuccessRate >= healthHealthyRate {
+			result.Healthy += 1
+		} else if item.SuccessRate >= healthWarningRate {
+			result.Warning += 1
+		} else {
+			result.Down += 1
+		}
+	}
+	return result
+}
+
+func addHealthBucketAggregate(target map[healthBucketModelKey]healthBucketAggregate, key healthBucketModelKey, value counters, lastSeen int64) {
+	if value.requestCount == 0 || key.model == "" {
+		return
+	}
+	current := target[key]
+	current.counters.requestCount += value.requestCount
+	current.counters.successCount += value.successCount
+	current.counters.totalLatencyMs += value.totalLatencyMs
+	current.counters.outputTokens += value.outputTokens
+	current.counters.generationMs += value.generationMs
+	if lastSeen > current.lastSeen {
+		current.lastSeen = lastSeen
+	}
+	target[key] = current
+}
+
+func rowCounters(row model.PerfMetricBucketSummary) counters {
+	return counters{
+		requestCount:   row.RequestCount,
+		successCount:   row.SuccessCount,
+		totalLatencyMs: row.TotalLatencyMs,
+		outputTokens:   row.OutputTokens,
+		generationMs:   row.GenerationMs,
+	}
+}
+
+func healthBucketFromCounters(ts int64, value counters, activeModels int, downModels int) HealthBucket {
+	return HealthBucket{
+		Ts:           ts,
+		RequestCount: value.requestCount,
+		SuccessCount: value.successCount,
+		AvgLatencyMs: avg(value.totalLatencyMs, value.requestCount),
+		SuccessRate:  roundedRate(successRate(value)),
+		AvgTps:       roundedRate(avgTps(value)),
+		ActiveModels: activeModels,
+		DownModels:   downModels,
+	}
+}
+
+func bucketHealthCounts(models map[string]counters) (int, int) {
+	active := 0
+	down := 0
+	for _, value := range models {
+		if value.requestCount == 0 {
+			continue
+		}
+		active += 1
+		if successRate(value) < healthWarningRate {
+			down += 1
+		}
+	}
+	return active, down
+}
+
+func healthTimestamps(startBucket int64, endBucket int64, bucketSeconds int64) []int64 {
+	if bucketSeconds <= 0 || endBucket < startBucket {
+		return []int64{}
+	}
+	timestamps := make([]int64, 0, int((endBucket-startBucket)/bucketSeconds)+1)
+	for ts := startBucket; ts <= endBucket; ts += bucketSeconds {
+		timestamps = append(timestamps, ts)
+	}
+	return timestamps
+}
+
+func healthBucketSeconds(hours int) int64 {
+	if hours <= 24 {
+		return 3600
+	}
+	if hours <= 72 {
+		return 6 * 3600
+	}
+	return 24 * 3600
+}
+
+func alignBucket(ts int64, bucketSeconds int64) int64 {
+	if bucketSeconds <= 0 {
+		return ts
+	}
+	return ts - (ts % bucketSeconds)
+}
+
+func roundedRate(value float64) float64 {
+	return math.Round(value*100) / 100
 }
 
 func getLogFallbackRows(startTs int64, endTs int64, groups []string, modelNames []string) ([]model.PerfMetricSummary, error) {

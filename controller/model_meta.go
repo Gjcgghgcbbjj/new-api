@@ -108,7 +108,7 @@ func GetModelsPerfHealth(c *gin.Context) {
 		}
 	}
 
-	result, err := perfmetrics.QuerySummaryAll(hours, nil)
+	result, err := perfmetrics.QueryHealth(hours, nil, nil)
 	if err != nil {
 		common.ApiError(c, err)
 		return

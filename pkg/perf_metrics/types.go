@@ -52,11 +52,54 @@ type ModelSummary struct {
 	AvgLatencyMs int64   `json:"avg_latency_ms"`
 	SuccessRate  float64 `json:"success_rate"`
 	AvgTps       float64 `json:"avg_tps"`
-	RequestCount int64   `json:"-"`
+	RequestCount int64   `json:"request_count"`
 }
 
 type SummaryAllResult struct {
 	Models []ModelSummary `json:"models"`
+}
+
+type HealthBucket struct {
+	Ts           int64   `json:"ts"`
+	RequestCount int64   `json:"request_count"`
+	SuccessCount int64   `json:"success_count"`
+	AvgLatencyMs int64   `json:"avg_latency_ms"`
+	SuccessRate  float64 `json:"success_rate"`
+	AvgTps       float64 `json:"avg_tps"`
+	ActiveModels int     `json:"active_models"`
+	DownModels   int     `json:"down_models"`
+}
+
+type HealthModelSummary struct {
+	ModelName    string         `json:"model_name"`
+	AvgLatencyMs int64          `json:"avg_latency_ms"`
+	SuccessRate  float64        `json:"success_rate"`
+	AvgTps       float64        `json:"avg_tps"`
+	RequestCount int64          `json:"request_count"`
+	SuccessCount int64          `json:"success_count"`
+	LastSeen     int64          `json:"last_seen"`
+	Trend        []HealthBucket `json:"trend"`
+}
+
+type HealthTotals struct {
+	TotalModels  int     `json:"total_models"`
+	Healthy      int     `json:"healthy"`
+	Warning      int     `json:"warning"`
+	Down         int     `json:"down"`
+	RequestCount int64   `json:"request_count"`
+	SuccessCount int64   `json:"success_count"`
+	AvgLatencyMs int64   `json:"avg_latency_ms"`
+	SuccessRate  float64 `json:"success_rate"`
+	AvgTps       float64 `json:"avg_tps"`
+}
+
+type HealthResult struct {
+	Models        []HealthModelSummary `json:"models"`
+	History       []HealthBucket       `json:"history"`
+	Totals        HealthTotals         `json:"totals"`
+	WindowHours   int                  `json:"window_hours"`
+	BucketSeconds int64                `json:"bucket_seconds"`
+	GeneratedAt   int64                `json:"generated_at"`
 }
 
 type bucketKey struct {

@@ -568,6 +568,50 @@ func GetLogPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string, mo
 	return summaries, err
 }
 
+func GetLogPerfMetricsBucketSummaryAll(startTs int64, endTs int64, bucketSeconds int64, groups []string, modelNames []string) ([]PerfMetricBucketSummary, error) {
+	var summaries []PerfMetricBucketSummary
+	if bucketSeconds <= 0 {
+		bucketSeconds = 3600
+	}
+	if modelNames != nil {
+		modelNames = normalizeLookupValues(modelNames)
+		if len(modelNames) == 0 {
+			return summaries, nil
+		}
+	}
+	bucketExpr := bucketExpression("created_at", bucketSeconds)
+	query := LOG_DB.Model(&Log{}).
+		Select(`
+			`+bucketExpr+` as bucket_ts,
+			model_name,
+			COUNT(*) as request_count,
+			SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as success_count,
+			COALESCE(SUM(CASE WHEN use_time > 0 THEN use_time ELSE 0 END), 0) * 1000 as total_latency_ms,
+			COALESCE(SUM(CASE WHEN type = ? THEN completion_tokens ELSE 0 END), 0) as output_tokens,
+			COALESCE(SUM(CASE WHEN type = ? AND use_time > 0 THEN use_time ELSE 0 END), 0) * 1000 as generation_ms,
+			MAX(created_at) as last_seen`,
+			LogTypeConsume,
+			LogTypeConsume,
+			LogTypeConsume,
+		).
+		Where("created_at >= ? AND created_at <= ? AND model_name <> ? AND type IN ?", startTs, endTs, "", []int{LogTypeConsume, LogTypeError})
+	if modelNames != nil {
+		query = query.Where("model_name IN ?", modelNames)
+	}
+	if groups != nil {
+		if len(groups) == 0 {
+			return summaries, nil
+		}
+		query = query.Where(logGroupCol+" IN ?", groups)
+	}
+	err := query.
+		Group("model_name, " + bucketExpr).
+		Having("COUNT(*) > 0").
+		Order("bucket_ts ASC").
+		Find(&summaries).Error
+	return summaries, err
+}
+
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
 	var total int64 = 0
 
