@@ -69,73 +69,6 @@ const renderVendorTag = (vendorId, vendorMap, t) => {
   );
 };
 
-const formatLatency = (latencyMs) => {
-  const value = Number(latencyMs);
-  if (!Number.isFinite(value) || value <= 0) return '-';
-  if (value < 1000) return `${Math.round(value)}ms`;
-  return `${(value / 1000).toFixed(2)}s`;
-};
-
-const formatTps = (tps) => {
-  const value = Number(tps);
-  if (!Number.isFinite(value) || value <= 0) return '-';
-  return `${value.toFixed(value >= 10 ? 1 : 2)}tps`;
-};
-
-const getHealthColor = (successRate) => {
-  if (successRate >= 99.9) return 'green';
-  if (successRate >= 99) return 'orange';
-  return 'red';
-};
-
-const renderModelHealth = (record, perfMap, t) => {
-  const perf = perfMap?.[record.model_name];
-  if (!perf) {
-    return (
-      <Tag size='small' shape='circle' color='white'>
-        {t('暂无数据')}
-      </Tag>
-    );
-  }
-
-  const successRate = Number.isFinite(Number(perf.success_rate))
-    ? Number(perf.success_rate)
-    : 0;
-  const latency = formatLatency(perf.avg_latency_ms);
-  const tps = formatTps(perf.avg_tps);
-
-  return (
-    <Tooltip
-      showArrow
-      content={
-        <div>
-          <div>
-            {t('成功率')}: {successRate.toFixed(1)}%
-          </div>
-          <div>
-            {t('平均延迟')}: {latency}
-          </div>
-          <div>TPS: {tps}</div>
-        </div>
-      }
-    >
-      <Space spacing={4} align='center'>
-        <Tag
-          size='small'
-          shape='circle'
-          color={getHealthColor(successRate)}
-          style={{ minWidth: 58, textAlign: 'center' }}
-        >
-          {successRate.toFixed(1)}%
-        </Tag>
-        <Text type='tertiary' size='small' style={{ whiteSpace: 'nowrap' }}>
-          {latency} / {tps}
-        </Text>
-      </Space>
-    </Tooltip>
-  );
-};
-
 // Render groups (enable_groups)
 const renderGroups = (groups) => {
   if (!groups || groups.length === 0) return '-';
@@ -347,7 +280,6 @@ export const getModelsColumns = ({
   setShowEdit,
   refresh,
   vendorMap,
-  perfMap,
 }) => {
   return [
     {
@@ -365,12 +297,6 @@ export const getModelsColumns = ({
           {text}
         </Text>
       ),
-    },
-    {
-      title: t('健康度'),
-      dataIndex: 'availability',
-      width: 170,
-      render: (text, record) => renderModelHealth(record, perfMap, t),
     },
     {
       title: t('匹配类型'),
