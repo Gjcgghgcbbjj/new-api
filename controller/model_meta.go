@@ -100,6 +100,22 @@ func GetModelsPerfSummary(c *gin.Context) {
 	common.ApiSuccess(c, result)
 }
 
+func GetModelsPerfHealth(c *gin.Context) {
+	hours := 24 * 30
+	if rawHours := c.Query("hours"); rawHours != "" {
+		if parsed, err := strconv.Atoi(rawHours); err == nil {
+			hours = parsed
+		}
+	}
+
+	result, err := perfmetrics.QuerySummaryAll(hours, nil)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
 func activePerfMetricGroups() []string {
 	groupRatios := ratio_setting.GetGroupRatioCopy()
 	groups := make([]string, 0, len(groupRatios)+1)

@@ -35,8 +35,6 @@ import { API, showError } from '../../helpers';
 
 const { Text, Title } = Typography;
 
-const PAGE_SIZE = 500;
-const PERF_BATCH_SIZE = 300;
 const HEALTHY_RATE = 99.9;
 const WARNING_RATE = 99;
 
@@ -65,11 +63,6 @@ const getHealthLabel = (successRate, t) => {
   return t('异常');
 };
 
-const extractItems = (payload) => {
-  const items = payload?.items || payload || [];
-  return Array.isArray(items) ? items : [];
-};
-
 const StatCard = ({ label, value, color }) => (
   <Card shadows='hover' className='rounded-xl'>
     <div className='flex items-center justify-between gap-3'>
@@ -92,85 +85,27 @@ const StatCard = ({ label, value, color }) => (
 const ModelHealthPage = () => {
   const { t } = useTranslation();
   const [models, setModels] = useState([]);
-  const [vendors, setVendors] = useState([]);
-  const [perfMap, setPerfMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
   const [healthFilter, setHealthFilter] = useState('all');
-  const [hours, setHours] = useState(24);
-
-  const vendorMap = useMemo(() => {
-    const map = {};
-    for (const vendor of vendors) {
-      map[vendor.id] = vendor;
-    }
-    return map;
-  }, [vendors]);
-
-  const loadAllModels = useCallback(async () => {
-    const first = await API.get(`/api/models/?p=1&page_size=${PAGE_SIZE}`);
-    const firstData = first.data?.data || {};
-    const firstItems = extractItems(firstData);
-    const total = firstData.total || firstItems.length;
-    const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    const allItems = [...firstItems];
-
-    for (let page = 2; page <= pageCount; page += 1) {
-      const res = await API.get(
-        `/api/models/?p=${page}&page_size=${PAGE_SIZE}`,
-      );
-      allItems.push(...extractItems(res.data?.data));
-    }
-
-    return allItems;
-  }, []);
-
-  const loadPerfSummary = useCallback(async (modelNames, targetHours) => {
-    const nextMap = {};
-    for (let start = 0; start < modelNames.length; start += PERF_BATCH_SIZE) {
-      const batch = modelNames.slice(start, start + PERF_BATCH_SIZE);
-      if (batch.length === 0) continue;
-
-      const res = await API.post(
-        '/api/models/perf-summary',
-        { models: batch, hours: targetHours },
-        { skipErrorHandler: true },
-      );
-      const items = res.data?.data?.models || [];
-      for (const item of items) {
-        if (item?.model_name) {
-          nextMap[item.model_name] = item;
-        }
-      }
-    }
-    return nextMap;
-  }, []);
+  const [hours, setHours] = useState(24 * 30);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [modelItems, vendorRes] = await Promise.all([
-        loadAllModels(),
-        API.get('/api/vendors/?page_size=1000').catch(() => null),
-      ]);
-
-      const vendorItems = extractItems(vendorRes?.data?.data);
-      const names = modelItems.map((model) => model.model_name).filter(Boolean);
-      const nextPerfMap = await loadPerfSummary(names, hours);
-
-      setModels(modelItems);
-      setVendors(vendorItems);
-      setPerfMap(nextPerfMap);
+      const res = await API.get(`/api/models/perf-health?hours=${hours}`, {
+        skipErrorHandler: true,
+      });
+      const items = res.data?.data?.models || [];
+      setModels(Array.isArray(items) ? items : []);
     } catch (error) {
       console.error(error);
       showError(t('获取模型健康度失败'));
       setModels([]);
-      setVendors([]);
-      setPerfMap({});
     } finally {
       setLoading(false);
     }
-  }, [hours, loadAllModels, loadPerfSummary, t]);
+  }, [hours, t]);
 
   useEffect(() => {
     loadData();
@@ -178,20 +113,20 @@ const ModelHealthPage = () => {
 
   const rows = useMemo(() => {
     return models.map((model) => {
-      const perf = perfMap[model.model_name];
-      const successRate = Number(perf?.success_rate);
+      const requestCount = Number(model.request_count) || 0;
+      const successRate = Number(model.success_rate);
+      const hasPerf = requestCount > 0 && Number.isFinite(successRate);
       return {
-        ...model,
-        key: model.id || model.model_name,
-        vendorName: vendorMap[model.vendor_id]?.name || '-',
-        hasPerf: !!perf,
+        key: model.model_name,
+        model_name: model.model_name,
+        hasPerf,
         successRate: Number.isFinite(successRate) ? successRate : null,
-        avgLatencyMs: Number(perf?.avg_latency_ms) || 0,
-        avgTps: Number(perf?.avg_tps) || 0,
-        requestCount: Number(perf?.request_count) || 0,
+        avgLatencyMs: Number(model.avg_latency_ms) || 0,
+        avgTps: Number(model.avg_tps) || 0,
+        requestCount,
       };
     });
-  }, [models, perfMap, vendorMap]);
+  }, [models]);
 
   const filteredRows = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
@@ -199,8 +134,7 @@ const ModelHealthPage = () => {
     return rows.filter((row) => {
       if (
         normalizedKeyword &&
-        !row.model_name?.toLowerCase().includes(normalizedKeyword) &&
-        !row.vendorName?.toLowerCase().includes(normalizedKeyword)
+        !row.model_name?.toLowerCase().includes(normalizedKeyword)
       ) {
         return false;
       }
@@ -308,25 +242,6 @@ const ModelHealthPage = () => {
         sorter: (a, b) => a.requestCount - b.requestCount,
         render: (value, record) => (record.hasPerf ? value : '-'),
       },
-      {
-        title: t('供应商'),
-        dataIndex: 'vendorName',
-        width: 150,
-      },
-      {
-        title: t('状态'),
-        dataIndex: 'status',
-        width: 100,
-        render: (value) => (
-          <Tag
-            size='small'
-            shape='circle'
-            color={value === 1 ? 'green' : 'red'}
-          >
-            {value === 1 ? t('启用') : t('禁用')}
-          </Tag>
-        ),
-      },
     ],
     [t],
   );
@@ -345,7 +260,7 @@ const ModelHealthPage = () => {
         <Space wrap>
           <Input
             prefix={<IconSearch />}
-            placeholder={t('搜索模型或供应商')}
+            placeholder={t('搜索模型')}
             value={keyword}
             onChange={setKeyword}
             style={{ width: 240 }}
@@ -367,6 +282,7 @@ const ModelHealthPage = () => {
             <Select.Option value={6}>{t('近 6 小时')}</Select.Option>
             <Select.Option value={24}>{t('近 24 小时')}</Select.Option>
             <Select.Option value={72}>{t('近 72 小时')}</Select.Option>
+            <Select.Option value={24 * 30}>{t('近 30 天')}</Select.Option>
           </Select>
           <Button icon={<IconRefresh />} loading={loading} onClick={loadData}>
             {t('刷新')}

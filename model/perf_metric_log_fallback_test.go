@@ -60,6 +60,16 @@ func TestGetLogPerfMetricsSummaryAll(t *testing.T) {
 	require.EqualValues(t, 20, summary.OutputTokens)
 	require.EqualValues(t, 2000, summary.GenerationMs)
 
+	allGroups, err := GetLogPerfMetricsSummaryAll(now-60, now, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, allGroups, 2)
+	modelNames := make(map[string]bool, len(allGroups))
+	for _, row := range allGroups {
+		modelNames[row.ModelName] = true
+	}
+	require.True(t, modelNames["gpt-test"])
+	require.True(t, modelNames["other-model"])
+
 	filtered, err := GetLogPerfMetricsSummaryAll(now-60, now, nil, []string{"other-model"})
 	require.NoError(t, err)
 	require.Len(t, filtered, 1)
