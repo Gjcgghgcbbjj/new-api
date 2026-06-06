@@ -26,6 +26,7 @@ import type {
   Model,
   Vendor,
   SearchModelsParams,
+  ModelsPerfSummaryResponse,
   SyncUpstreamResponse,
   PreviewUpstreamDiffResponse,
   MissingModelsResponse,
@@ -66,6 +67,21 @@ export async function searchModels(
  */
 export async function getModel(id: number): Promise<GetModelResponse> {
   const res = await api.get(`/api/models/${id}`)
+  return res.data
+}
+
+export async function getModelsPerfSummary(
+  models: string[],
+  hours = 24
+): Promise<ModelsPerfSummaryResponse> {
+  const res = await api.post(
+    '/api/models/perf-summary',
+    { models, hours },
+    {
+      skipBusinessError: true,
+      skipErrorHandler: true,
+    }
+  )
   return res.data
 }
 

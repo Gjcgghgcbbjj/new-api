@@ -21,6 +21,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
+	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
@@ -41,6 +42,15 @@ type testResult struct {
 	context     *gin.Context
 	localErr    error
 	newAPIError *types.NewAPIError
+}
+
+func recordChannelTestPerfSample(info *relaycommon.RelayInfo, success bool, outputTokens int64) {
+	if info == nil {
+		return
+	}
+	gopool.Go(func() {
+		perfmetrics.RecordRelaySample(info, success, outputTokens)
+	})
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointType string) string {
@@ -159,6 +169,7 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 		Body:   nil,
 		Header: make(http.Header),
 	}
+	common.SetContextKey(c, constant.ContextKeyRequestStartTime, tik)
 
 	cache, err := model.GetUserCache(testUserID)
 	if err != nil {
@@ -250,6 +261,11 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 
 	info.IsChannelTest = true
 	info.InitChannelMeta(c)
+	perfSuccess := false
+	perfOutputTokens := int64(0)
+	defer func() {
+		recordChannelTestPerfSample(info, perfSuccess, perfOutputTokens)
+	}()
 
 	err = attachTestBillingRequestInput(info, request)
 	if err != nil {
@@ -495,6 +511,8 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 		}
 	}
 	info.SetEstimatePromptTokens(usage.PromptTokens)
+	perfSuccess = true
+	perfOutputTokens = int64(usage.CompletionTokens)
 
 	quota, tieredResult := settleTestQuota(info, priceData, usage)
 	tok := time.Now()

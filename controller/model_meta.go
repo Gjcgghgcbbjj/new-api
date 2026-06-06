@@ -9,6 +9,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
 )
@@ -75,6 +77,37 @@ func GetModelMeta(c *gin.Context) {
 	}
 	enrichModels([]*model.Model{&m})
 	common.ApiSuccess(c, &m)
+}
+
+type modelPerfSummaryRequest struct {
+	Models []string `json:"models"`
+	Hours  int      `json:"hours"`
+}
+
+func GetModelsPerfSummary(c *gin.Context) {
+	var req modelPerfSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	activeGroups := activePerfMetricGroups()
+	result, err := perfmetrics.QuerySummaryForModels(req.Hours, activeGroups, req.Models)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func activePerfMetricGroups() []string {
+	groupRatios := ratio_setting.GetGroupRatioCopy()
+	groups := make([]string, 0, len(groupRatios)+1)
+	for group := range groupRatios {
+		groups = append(groups, group)
+	}
+	groups = append(groups, "auto")
+	return groups
 }
 
 // CreateModelMeta 新建模型

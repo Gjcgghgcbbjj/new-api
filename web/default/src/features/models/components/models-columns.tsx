@@ -20,6 +20,7 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { formatTimestampToDate } from '@/lib/format'
 import { getLobeIcon } from '@/lib/lobe-icon'
+import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Tooltip,
@@ -31,6 +32,11 @@ import { DataTableColumnHeader } from '@/components/data-table/column-header'
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge, StatusBadgeList } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
+import {
+  formatLatency,
+  formatThroughput,
+} from '@/features/performance-metrics/lib/format'
+import type { PerfModelSummary } from '@/features/performance-metrics/types'
 import {
   getModelStatusConfig,
   getNameRuleConfig,
@@ -57,10 +63,82 @@ function renderLimitedItems(
   )
 }
 
+function getAvailabilityVariant(
+  successRate: number
+): 'success' | 'warning' | 'danger' {
+  if (successRate >= 99.9) return 'success'
+  if (successRate >= 99) return 'warning'
+  return 'danger'
+}
+
+function getAvailabilityDotClass(successRate: number) {
+  if (successRate >= 99.9) return 'bg-emerald-500'
+  if (successRate >= 99) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function formatCompactThroughput(tps: number): string {
+  return formatThroughput(tps).replace(' t/s', 'tps')
+}
+
+function ModelAvailabilityCell({ perf }: { perf?: PerfModelSummary }) {
+  const { t } = useTranslation()
+
+  if (!perf) {
+    return (
+      <StatusBadge
+        label={t('No data')}
+        variant='neutral'
+        size='sm'
+        copyable={false}
+      />
+    )
+  }
+
+  const successRate = Number.isFinite(perf.success_rate) ? perf.success_rate : 0
+
+  return (
+    <div className='flex min-w-[150px] items-center gap-2'>
+      <StatusBadge
+        variant={getAvailabilityVariant(successRate)}
+        size='sm'
+        copyable={false}
+        className='min-w-[64px] justify-center tabular-nums'
+      >
+        {successRate.toFixed(1)}%
+      </StatusBadge>
+      <div className='grid min-w-0 grid-cols-[44px_46px_12px] items-center gap-x-1 text-right tabular-nums'>
+        <span
+          title={t('Average latency')}
+          className='text-muted-foreground font-mono text-xs whitespace-nowrap'
+        >
+          {formatLatency(perf.avg_latency_ms)}
+        </span>
+        <span
+          title={t('Throughput')}
+          className='text-muted-foreground font-mono text-xs whitespace-nowrap'
+        >
+          {formatCompactThroughput(perf.avg_tps)}
+        </span>
+        <span
+          title={t('Status')}
+          className={cn(
+            'inline-block h-3 w-1 rounded-full',
+            getAvailabilityDotClass(successRate)
+          )}
+        />
+      </div>
+    </div>
+  )
+}
+
 /**
  * Generate models columns configuration
  */
-export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
+export function useModelsColumns(
+  vendors: Vendor[] = [],
+  perfMap?: Map<string, PerfModelSummary>
+): ColumnDef<Model>[] {
   const { t } = useTranslation()
 
   // Get translated configs
@@ -244,6 +322,18 @@ export function useModelsColumns(vendors: Vendor[] = []): ColumnDef<Model>[] {
       },
       size: 120,
       enableSorting: false,
+    },
+
+    // Availability column
+    {
+      id: 'availability',
+      meta: { label: t('Availability'), mobileHidden: true },
+      header: t('Availability'),
+      cell: ({ row }) => (
+        <ModelAvailabilityCell perf={perfMap?.get(row.original.model_name)} />
+      ),
+      size: 180,
+      enableSorting: true,
     },
 
     // Vendor column

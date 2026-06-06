@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,10 +16,17 @@ import (
 )
 
 var hotBuckets sync.Map
+var logFallbackCache sync.Map
 
 // seriesSchema is a stable client cache/schema marker. Do not change it when
 // hiding fields or making response-only privacy hardening changes.
 const seriesSchema = "dbcd0a3c01b55203"
+const logFallbackCacheTTL = 60 * time.Second
+
+type logFallbackCacheEntry struct {
+	expiresAt time.Time
+	rows      []model.PerfMetricSummary
+}
 
 func Init() {
 	go flushLoop()
@@ -123,6 +131,18 @@ func Query(params QueryParams) (QueryResult, error) {
 }
 
 func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
+	return querySummary(hours, groups, nil)
+}
+
+func QuerySummaryForModels(hours int, groups []string, modelNames []string) (SummaryAllResult, error) {
+	modelNames = normalizeStringList(modelNames)
+	if len(modelNames) == 0 {
+		return SummaryAllResult{Models: []ModelSummary{}}, nil
+	}
+	return querySummary(hours, groups, modelNames)
+}
+
+func querySummary(hours int, groups []string, modelNames []string) (SummaryAllResult, error) {
 	if hours <= 0 {
 		hours = 24
 	}
@@ -132,8 +152,9 @@ func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
 	endTs := time.Now().Unix()
 	startTs := endTs - int64(hours)*3600
 	allowedGroups := allowedGroupSet(groups)
+	allowedModels := allowedModelSet(modelNames)
 
-	rows, err := model.GetPerfMetricsSummaryAll(startTs, endTs, groups)
+	rows, err := model.GetPerfMetricsSummaryAll(startTs, endTs, groups, modelNames)
 	if err != nil {
 		return SummaryAllResult{}, err
 	}
@@ -154,6 +175,11 @@ func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
 		if k.bucketTs < startTs || k.bucketTs > endTs {
 			return true
 		}
+		if allowedModels != nil {
+			if _, ok := allowedModels[k.model]; !ok {
+				return true
+			}
+		}
 		if allowedGroups != nil {
 			if _, ok := allowedGroups[k.group]; !ok {
 				return true
@@ -172,6 +198,27 @@ func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
 		totals[k.model] = cur
 		return true
 	})
+
+	missingModels := missingModelNames(modelNames, totals)
+	if logRows, logErr := getLogFallbackRows(startTs, endTs, groups, missingModels); logErr == nil {
+		for _, row := range logRows {
+			if row.RequestCount == 0 {
+				continue
+			}
+			if _, ok := totals[row.ModelName]; ok {
+				continue
+			}
+			totals[row.ModelName] = counters{
+				requestCount:   row.RequestCount,
+				successCount:   row.SuccessCount,
+				totalLatencyMs: row.TotalLatencyMs,
+				outputTokens:   row.OutputTokens,
+				generationMs:   row.GenerationMs,
+			}
+		}
+	} else {
+		common.SysError("failed to query log perf metrics fallback: " + logErr.Error())
+	}
 
 	models := make([]ModelSummary, 0, len(totals))
 	for name, total := range totals {
@@ -197,6 +244,92 @@ func QuerySummaryAll(hours int, groups []string) (SummaryAllResult, error) {
 	})
 
 	return SummaryAllResult{Models: models}, nil
+}
+
+func getLogFallbackRows(startTs int64, endTs int64, groups []string, modelNames []string) ([]model.PerfMetricSummary, error) {
+	if modelNames != nil {
+		modelNames = normalizeStringList(modelNames)
+		if len(modelNames) == 0 {
+			return []model.PerfMetricSummary{}, nil
+		}
+	}
+	key := logFallbackCacheKey(startTs, endTs, groups, modelNames)
+	now := time.Now()
+	if cached, ok := logFallbackCache.Load(key); ok {
+		entry := cached.(logFallbackCacheEntry)
+		if now.Before(entry.expiresAt) {
+			return entry.rows, nil
+		}
+		logFallbackCache.Delete(key)
+	}
+	rows, err := model.GetLogPerfMetricsSummaryAll(startTs, endTs, groups, modelNames)
+	if err != nil {
+		return nil, err
+	}
+	logFallbackCache.Store(key, logFallbackCacheEntry{
+		expiresAt: now.Add(logFallbackCacheTTL),
+		rows:      rows,
+	})
+	return rows, nil
+}
+
+func logFallbackCacheKey(startTs int64, endTs int64, groups []string, modelNames []string) string {
+	normalizedGroups := normalizeStringList(groups)
+	normalizedModels := normalizeStringList(modelNames)
+	groupKey := "*"
+	if groups != nil {
+		groupKey = strings.Join(normalizedGroups, ",")
+	}
+	modelKey := "*"
+	if modelNames != nil {
+		modelKey = strings.Join(normalizedModels, ",")
+	}
+	return fmt.Sprintf("%d:%d:g=%s:m=%s", startTs/60, endTs/60, groupKey, modelKey)
+}
+
+func normalizeStringList(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+	sort.Strings(normalized)
+	return normalized
+}
+
+func allowedModelSet(modelNames []string) map[string]struct{} {
+	if modelNames == nil {
+		return nil
+	}
+	allowed := make(map[string]struct{}, len(modelNames))
+	for _, name := range modelNames {
+		allowed[name] = struct{}{}
+	}
+	return allowed
+}
+
+func missingModelNames(modelNames []string, totals map[string]counters) []string {
+	if modelNames == nil {
+		return nil
+	}
+	missing := make([]string, 0, len(modelNames))
+	for _, name := range modelNames {
+		if _, ok := totals[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 func allowedGroupSet(groups []string) map[string]struct{} {

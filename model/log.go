@@ -531,6 +531,43 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	return token
 }
 
+func GetLogPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string, modelNames []string) ([]PerfMetricSummary, error) {
+	var summaries []PerfMetricSummary
+	if modelNames != nil {
+		modelNames = normalizeLookupValues(modelNames)
+		if len(modelNames) == 0 {
+			return summaries, nil
+		}
+	}
+	query := LOG_DB.Model(&Log{}).
+		Select(`
+			model_name,
+			COUNT(*) as request_count,
+			SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as success_count,
+			COALESCE(SUM(CASE WHEN use_time > 0 THEN use_time ELSE 0 END), 0) * 1000 as total_latency_ms,
+			COALESCE(SUM(CASE WHEN type = ? THEN completion_tokens ELSE 0 END), 0) as output_tokens,
+			COALESCE(SUM(CASE WHEN type = ? AND use_time > 0 THEN use_time ELSE 0 END), 0) * 1000 as generation_ms`,
+			LogTypeConsume,
+			LogTypeConsume,
+			LogTypeConsume,
+		).
+		Where("created_at >= ? AND created_at <= ? AND model_name <> ? AND type IN ?", startTs, endTs, "", []int{LogTypeConsume, LogTypeError})
+	if modelNames != nil {
+		query = query.Where("model_name IN ?", modelNames)
+	}
+	if groups != nil {
+		if len(groups) == 0 {
+			return summaries, nil
+		}
+		query = query.Where(logGroupCol+" IN ?", groups)
+	}
+	err := query.
+		Group("model_name").
+		Having("COUNT(*) > 0").
+		Find(&summaries).Error
+	return summaries, err
+}
+
 func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64, error) {
 	var total int64 = 0
 

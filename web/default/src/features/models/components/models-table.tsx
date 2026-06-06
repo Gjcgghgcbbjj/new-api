@@ -29,7 +29,13 @@ import { useMediaQuery } from '@/hooks'
 import { useTranslation } from 'react-i18next'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import { DataTablePage } from '@/components/data-table'
-import { getModels, searchModels, getVendors } from '../api'
+import type { PerfModelSummary } from '@/features/performance-metrics/types'
+import {
+  getModels,
+  getModelsPerfSummary,
+  searchModels,
+  getVendors,
+} from '../api'
 import {
   DEFAULT_PAGE_SIZE,
   getModelStatusOptions,
@@ -41,6 +47,7 @@ import { useModelsColumns } from './models-columns'
 import { useModels } from './models-provider'
 
 const route = getRouteApi('/_authenticated/models/$section')
+const AVAILABILITY_HEALTHY_RATE = 99.9
 
 export function ModelsTable() {
   const { t } = useTranslation()
@@ -77,6 +84,7 @@ export function ModelsTable() {
       { columnId: 'status', searchKey: 'status', type: 'array' },
       { columnId: 'vendor_id', searchKey: 'vendor', type: 'array' },
       { columnId: 'sync_official', searchKey: 'sync', type: 'array' },
+      { columnId: 'availability', searchKey: 'availability', type: 'array' },
     ],
   })
 
@@ -87,6 +95,9 @@ export function ModelsTable() {
     (columnFilters.find((f) => f.id === 'vendor_id')?.value as string[]) || []
   const syncFilter =
     (columnFilters.find((f) => f.id === 'sync_official')?.value as string[]) ||
+    []
+  const availabilityFilter =
+    (columnFilters.find((f) => f.id === 'availability')?.value as string[]) ||
     []
 
   // Fetch vendors for filter
@@ -171,15 +182,69 @@ export function ModelsTable() {
   const models = data?.data?.items || []
   const totalCount = data?.data?.total || 0
   const vendorCounts = data?.data?.vendor_counts
+  const perfModelNames = useMemo(
+    () => models.map((model) => model.model_name).filter(Boolean),
+    [models]
+  )
+
+  const perfQuery = useQuery({
+    queryKey: ['models', 'perf-summary', 24, perfModelNames],
+    queryFn: () => getModelsPerfSummary(perfModelNames, 24),
+    enabled: perfModelNames.length > 0,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+
+  const perfMap = useMemo(() => {
+    const map = new Map<string, PerfModelSummary>()
+    for (const model of perfQuery.data?.data?.models ?? []) {
+      map.set(model.model_name, model)
+    }
+    return map
+  }, [perfQuery.data])
+
+  const visibleModels = useMemo(() => {
+    let result = models
+    const activeAvailability = availabilityFilter.filter(
+      (value) => value !== 'all'
+    )
+    if (activeAvailability.length > 0) {
+      result = result.filter((model) => {
+        const perf = perfMap.get(model.model_name)
+        if (!perf) return activeAvailability.includes('no_data')
+        const healthy = perf.success_rate >= AVAILABILITY_HEALTHY_RATE
+        return activeAvailability.includes(healthy ? 'healthy' : 'degraded')
+      })
+    }
+
+    const activeSort = sorting[0]
+    if (activeSort?.id !== 'availability') {
+      return result
+    }
+
+    return [...result].sort((a, b) => {
+      const aPerf = perfMap.get(a.model_name)
+      const bPerf = perfMap.get(b.model_name)
+      const aRate = aPerf?.success_rate ?? -1
+      const bRate = bPerf?.success_rate ?? -1
+      return activeSort.desc ? bRate - aRate : aRate - bRate
+    })
+  }, [availabilityFilter, models, perfMap, sorting])
+
+  const availabilityFilterActive =
+    availabilityFilter.length > 0 && !availabilityFilter.includes('all')
+  const effectiveTotalCount = availabilityFilterActive
+    ? visibleModels.length
+    : totalCount
 
   // Columns configuration
-  const columns = useModelsColumns(vendors)
+  const columns = useModelsColumns(vendors, perfMap)
 
   // React Table instance
   const table = useReactTable({
-    data: models,
+    data: visibleModels,
     columns,
-    pageCount: Math.ceil(totalCount / pagination.pageSize),
+    pageCount: Math.ceil(effectiveTotalCount / pagination.pageSize),
     state: {
       sorting,
       columnFilters,
@@ -218,6 +283,12 @@ export function ModelsTable() {
       value: option.value,
     })),
   ]
+  const availabilityFilterOptions = [
+    { label: t('All'), value: 'all' },
+    { label: t('Healthy'), value: 'healthy' },
+    { label: t('Degraded'), value: 'degraded' },
+    { label: t('No data'), value: 'no_data' },
+  ]
 
   return (
     <DataTablePage
@@ -250,6 +321,12 @@ export function ModelsTable() {
             columnId: 'sync_official',
             title: t('Official Sync'),
             options: [...getSyncStatusOptions(t)],
+            singleSelect: true,
+          },
+          {
+            columnId: 'availability',
+            title: t('Availability'),
+            options: availabilityFilterOptions,
             singleSelect: true,
           },
         ],

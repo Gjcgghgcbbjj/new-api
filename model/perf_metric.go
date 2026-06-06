@@ -68,11 +68,20 @@ type PerfMetricSummary struct {
 	GenerationMs   int64  `json:"generation_ms"`
 }
 
-func GetPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string) ([]PerfMetricSummary, error) {
+func GetPerfMetricsSummaryAll(startTs int64, endTs int64, groups []string, modelNames []string) ([]PerfMetricSummary, error) {
 	var summaries []PerfMetricSummary
+	if modelNames != nil {
+		modelNames = normalizeLookupValues(modelNames)
+		if len(modelNames) == 0 {
+			return summaries, nil
+		}
+	}
 	query := DB.Model(&PerfMetric{}).
 		Select("model_name, SUM(request_count) as request_count, SUM(success_count) as success_count, SUM(total_latency_ms) as total_latency_ms, SUM(output_tokens) as output_tokens, SUM(generation_ms) as generation_ms").
 		Where("bucket_ts >= ? AND bucket_ts <= ?", startTs, endTs)
+	if modelNames != nil {
+		query = query.Where("model_name IN ?", modelNames)
+	}
 	if groups != nil {
 		if len(groups) == 0 {
 			return summaries, nil

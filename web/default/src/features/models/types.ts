@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
+import type { PerfModelSummary } from '@/features/performance-metrics/types'
 
 // ============================================================================
 // Model Types
@@ -209,6 +210,14 @@ export interface MissingModelsResponse {
   success: boolean
   message?: string
   data?: string[]
+}
+
+export interface ModelsPerfSummaryResponse {
+  success: boolean
+  message?: string
+  data?: {
+    models: PerfModelSummary[]
+  }
 }
 
 /**
