@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-06-05-responses-chat-compatir",
+  "currentTodo": "Follow-up hardening complete",
+  "completedTodos": [
+    "Created ADR for Responses <-> Chat CompatIR owner boundary",
+    "Added stream tests for tool-only stable ordering, reasoning summary section separation, and parallel function-call indexes"
+  ],
+  "activeSlice": "ADR record and stream fixture expansion",
+  "evidenceRefs": [
+    "task6-adr-stream-fixtures"
+  ],
+  "blockedOn": null,
+  "nextStep": "Push follow-up commit and rebuild GHCR image if desired",
+  "updatedAt": "2026-06-05"
+}

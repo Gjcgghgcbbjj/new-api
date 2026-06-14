@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "requestedOutcome": "Implement a canonical CompatIR owner for Responses <-> Chat conversions",
+  "goal": "Route Responses <-> Chat request, response, and stream semantic conversions through service/compatir without changing public API behavior",
+  "successEvidence": [
+    "service/compatir tests plus service and relay regression tests pass; old pairwise mapping logic is retired or wrapper-only"
+  ],
+  "stopCondition": "done when all planned slices pass verification; blocked on repeated test failures or scope expansion beyond Responses <-> Chat; needs-verification if tests cannot run",
+  "nonGoals": [
+    "Claude/Gemini IR migration",
+    "database or pricing changes"
+  ],
+  "scope": "Responses <-> Chat conversions only",
+  "changeKinds": [
+    "architecture"
+  ],
+  "riskHints": [
+    "duplicate conversion owners and lossy field handling"
+  ]
+}

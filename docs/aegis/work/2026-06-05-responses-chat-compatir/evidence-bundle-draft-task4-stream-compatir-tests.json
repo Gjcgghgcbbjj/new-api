@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "artifactKey": "task4-stream-compatir-tests",
+  "type": "test",
+  "source": "PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/compatir ./service/openaicompat ./relay/channel/openai -run 'Stream|Responses|Chat|Bridge|CompatIR' -count=1 && git diff --check",
+  "summary": "Task 4 stream conversion routes through CompatIR; focused compatir/openaicompat/openai relay regression passed; handler-local stream semantic mapping branches retired",
+  "verifier": "codex"
+}

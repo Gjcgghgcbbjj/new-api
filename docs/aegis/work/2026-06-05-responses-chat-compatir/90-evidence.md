@@ -1,0 +1,43 @@
+# Responses Chat CompatIR - Evidence
+
+No evidence has been recorded yet.
+
+## EvidenceBundleDraft
+
+- Artifact key: task1-compatir-core-tests
+- Type: test
+- Source: PATH=/root/.local/go1.25.1/bin:/root/.codex/tmp/arg0/codex-arg0WIlICU:/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/e/CodexCLI/npm-global:/mnt/c/Users/niting/.cargo/bin:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/c/Users/niting/AppData/Roaming/npm:/mnt/c/Users/niting/AppData/Roaming/npm:/mnt/c/Users/niting/AppData/Local/Alma/bin:/snap/bin:/root/.local/bin:/root/.local/bin:/root/.local/bin go test ./service/compatir ./service/openaicompat ./relay ./relay/channel/openai -run 'Responses|Chat|Bridge|CompatIR' -count=1
+- Summary: Task 1 core CompatIR tests and bridge regression slice passed
+- Verifier: codex
+
+## EvidenceBundleDraft
+
+- Artifact key: task2-request-compatir-tests
+- Type: test
+- Source: PATH=/root/.local/go1.25.1/bin:/root/.codex/tmp/arg0/codex-arg0WIlICU:/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/e/CodexCLI/npm-global:/mnt/c/Users/niting/.cargo/bin:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/c/Users/niting/AppData/Roaming/npm:/mnt/c/Users/niting/AppData/Roaming/npm:/mnt/c/Users/niting/AppData/Local/Alma/bin:/snap/bin:/root/.local/bin:/root/.local/bin:/root/.local/bin go test ./service/... ./relay/... -count=1 && git diff --check
+- Summary: Task 2 request converters route through CompatIR; full service and relay regression passed
+- Verifier: codex
+
+## EvidenceBundleDraft
+
+- Artifact key: task3-response-compatir-tests
+- Type: test
+- Source: PATH=/root/.local/go1.25.1/bin:/root/.codex/tmp/arg0/codex-arg0WIlICU:/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/codex-path:/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/e/CodexCLI/npm-global:/mnt/c/Users/niting/.cargo/bin:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/c/Python314/Scripts/:/mnt/c/Python314/:/mnt/c/Windows/system32:/mnt/c/Windows:/mnt/c/Windows/System32/Wbem:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/:/mnt/c/Windows/System32/OpenSSH/:/mnt/c/Program Files/NVIDIA Corporation/NVIDIA App/NvDLISR:/mnt/c/Program Files (x86)/NVIDIA Corporation/PhysX/Common:/mnt/c/ProgramData/chocolatey/bin:/mnt/c/Program Files/PowerShell/7/:/mnt/c/Program Files/Git/cmd:/mnt/d/Sunshine:/mnt/d/Sunshine/tools:/mnt/c/Program Files/Tailscale/:/mnt/c/Program Files/nodejs/:/mnt/c/Users/niting/AppData/Roaming/npm:/mnt/c/Users/niting/AppData/Roaming/npm:/mnt/c/Users/niting/AppData/Local/Alma/bin:/snap/bin:/root/.local/bin:/root/.local/bin:/root/.local/bin go test ./service/... ./relay/... -count=1 && rg lingering response wrappers && git diff --check
+- Summary: Task 3 non-stream response conversion routes through CompatIR; full service and relay regression passed; openaicompat response functions are wrapper-only
+- Verifier: codex
+
+## EvidenceBundleDraft
+
+- Artifact key: task4-stream-compatir-tests
+- Type: test
+- Source: PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/compatir ./service/openaicompat ./relay/channel/openai -run 'Stream|Responses|Chat|Bridge|CompatIR' -count=1 && git diff --check
+- Summary: Task 4 stream conversion routes through CompatIR; focused compatir/openaicompat/openai relay regression passed; handler-local stream semantic mapping branches retired
+- Verifier: codex
+
+## EvidenceBundleDraft
+
+- Artifact key: task6-adr-stream-fixtures
+- Type: test
+- Source: PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/compatir -run 'Stream|CompatIR' -count=1 && PATH=/root/.local/go1.25.1/bin:$PATH go test ./service/... ./relay/... -count=1 && git diff --check
+- Summary: Post-completion hardening added ADR for the CompatIR owner decision and stream fixtures for tool-only stable ordering, reasoning summary spacing, and parallel tool indexes; focused and full service/relay regression passed
+- Verifier: codex

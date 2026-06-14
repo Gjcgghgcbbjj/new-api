@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "aegis.schema.v0",
+  "taskId": "2026-06-05-responses-chat-compatir",
+  "taskIntentRef": "docs/aegis/work/2026-06-05-responses-chat-compatir/task-intent-draft.json",
+  "baselineRefs": [
+    "docs/aegis/plans/2026-06-05-responses-chat-compatir.md"
+  ],
+  "scopeStatus": "Post-completion hardening stayed inside ADR memory and CompatIR stream tests",
+  "compatStatus": "No runtime behavior changes; tests only lock existing stream semantics",
+  "retirementStatus": "ADR records service/compatir as canonical owner and documents retired wrapper/relay semantic owners",
+  "newRiskSignals": [],
+  "decision": "continue"
+}
