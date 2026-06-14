@@ -35,6 +35,9 @@ func FromChatRequest(req *dto.GeneralOpenAIRequest) (*Request, error) {
 	if req.N != nil && *req.N > 1 {
 		return nil, fmt.Errorf("n>1 is not supported in responses compatibility mode")
 	}
+	if chatStopSet(req.Stop) {
+		return nil, &ConversionError{Field: "stop", Message: "stop sequences are not supported in responses compatibility mode"}
+	}
 
 	out := &Request{
 		Model:                req.Model,
@@ -68,8 +71,22 @@ func FromChatRequest(req *dto.GeneralOpenAIRequest) (*Request, error) {
 			})
 		}
 	}
+	if rawJSONSet(req.Functions) {
+		functionTools, err := legacyFunctionsToIRTools(req.Functions)
+		if err != nil {
+			return nil, err
+		}
+		out.Tools = append(out.Tools, functionTools...)
+	}
 	if req.ToolChoice != nil {
 		out.ToolChoice = chatToolChoiceToIR(req.ToolChoice)
+	}
+	if rawJSONSet(req.FunctionCall) {
+		choice, err := legacyFunctionCallToIRToolChoice(req.FunctionCall)
+		if err != nil {
+			return nil, err
+		}
+		out.ToolChoice = choice
 	}
 
 	var instructions []string
@@ -371,6 +388,74 @@ func maxOutputTokens(req *dto.GeneralOpenAIRequest) *uint {
 	return &maxOutputTokens
 }
 
+func chatStopSet(stop any) bool {
+	switch v := stop.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(v) != ""
+	case []string:
+		return len(v) > 0
+	case []any:
+		return len(v) > 0
+	case json.RawMessage:
+		return rawJSONSet(v)
+	default:
+		return true
+	}
+}
+
+func legacyFunctionsToIRTools(raw json.RawMessage) ([]ToolDefinition, error) {
+	var functions []dto.FunctionRequest
+	if err := common.Unmarshal(raw, &functions); err != nil {
+		return nil, &ConversionError{Field: "functions", Message: "must be an array of function definitions"}
+	}
+	tools := make([]ToolDefinition, 0, len(functions))
+	for idx, fn := range functions {
+		if strings.TrimSpace(fn.Name) == "" {
+			return nil, &ConversionError{Field: fmt.Sprintf("functions[%d].name", idx), Message: "function name is required"}
+		}
+		tools = append(tools, ToolDefinition{
+			Type:        ToolTypeFunction,
+			Name:        fn.Name,
+			Description: fn.Description,
+			Parameters:  fn.Parameters,
+		})
+	}
+	return tools, nil
+}
+
+func legacyFunctionCallToIRToolChoice(raw json.RawMessage) (*ToolChoice, error) {
+	switch common.GetJsonType(raw) {
+	case "string":
+		var choice string
+		if err := common.Unmarshal(raw, &choice); err != nil {
+			return nil, &ConversionError{Field: "function_call", Message: "must be a string or object"}
+		}
+		choice = strings.TrimSpace(choice)
+		switch choice {
+		case "":
+			return nil, nil
+		case "auto", "none":
+			return &ToolChoice{Mode: choice}, nil
+		default:
+			return nil, &ConversionError{Field: "function_call", Message: fmt.Sprintf("legacy function_call value %q cannot be represented by Responses tool_choice", choice)}
+		}
+	case "object":
+		var choice map[string]any
+		if err := common.Unmarshal(raw, &choice); err != nil {
+			return nil, &ConversionError{Field: "function_call", Message: "must be a string or object"}
+		}
+		name := strings.TrimSpace(common.Interface2String(choice["name"]))
+		if name == "" {
+			return nil, &ConversionError{Field: "function_call.name", Message: "function name is required"}
+		}
+		return &ToolChoice{Mode: ToolTypeFunction, FunctionName: name}, nil
+	default:
+		return nil, &ConversionError{Field: "function_call", Message: "must be a string or object"}
+	}
+}
+
 func convertChatResponseFormatToResponsesText(reqFormat *dto.ResponseFormat) json.RawMessage {
 	if reqFormat == nil || strings.TrimSpace(reqFormat.Type) == "" {
 		return nil
@@ -489,13 +574,13 @@ func irContentToResponsesContent(role string, parts []ContentPart) any {
 			contentParts = append(contentParts, map[string]any{"type": partType, "text": part.Text})
 		case ContentTypeImageURL:
 			textOnly = false
-			contentParts = append(contentParts, map[string]any{"type": "input_image", "image_url": normalizeChatImageURLToString(part.ImageURL)})
+			contentParts = append(contentParts, irImageContentToResponses(part.ImageURL))
 		case ContentTypeInputAudio:
 			textOnly = false
 			contentParts = append(contentParts, map[string]any{"type": "input_audio", "input_audio": part.InputAudio})
 		case ContentTypeFile:
 			textOnly = false
-			contentParts = append(contentParts, map[string]any{"type": "input_file", "file": part.File})
+			contentParts = append(contentParts, irFileContentToResponses(part.File))
 		case ContentTypeVideoURL:
 			textOnly = false
 			contentParts = append(contentParts, map[string]any{"type": "input_video", "video_url": part.VideoURL})
@@ -505,6 +590,26 @@ func irContentToResponsesContent(role string, parts []ContentPart) any {
 		return text.String()
 	}
 	return contentParts
+}
+
+func irImageContentToResponses(v any) map[string]any {
+	item := map[string]any{"type": "input_image"}
+	imageURL := normalizeChatImageURLToString(v)
+	if imageURL != nil {
+		item["image_url"] = imageURL
+	}
+	if detail := chatImageDetail(v); detail != "" {
+		item["detail"] = detail
+	}
+	return item
+}
+
+func irFileContentToResponses(v any) map[string]any {
+	item := map[string]any{"type": "input_file"}
+	for key, value := range chatFileFields(v) {
+		item[key] = value
+	}
+	return item
 }
 
 func irContentToChatContent(parts []ContentPart) any {
@@ -620,11 +725,11 @@ func responsesContentToIRContent(content any) []ContentPart {
 			case "input_text", "output_text", "text":
 				parts = append(parts, ContentPart{Type: ContentTypeText, Text: common.Interface2String(item["text"])})
 			case "input_image":
-				parts = append(parts, ContentPart{Type: ContentTypeImageURL, ImageURL: item["image_url"]})
+				parts = append(parts, ContentPart{Type: ContentTypeImageURL, ImageURL: responsesInputImageToChatImage(item)})
 			case "input_audio":
 				parts = append(parts, ContentPart{Type: ContentTypeInputAudio, InputAudio: item["input_audio"]})
 			case "input_file":
-				parts = append(parts, ContentPart{Type: ContentTypeFile, File: item["file"]})
+				parts = append(parts, ContentPart{Type: ContentTypeFile, File: responsesInputFileToChatFile(item)})
 			case "input_video":
 				parts = append(parts, ContentPart{Type: ContentTypeVideoURL, VideoURL: item["video_url"]})
 			}
@@ -633,6 +738,52 @@ func responsesContentToIRContent(content any) []ContentPart {
 	default:
 		return []ContentPart{{Type: ContentTypeText, Text: interfaceToText(v)}}
 	}
+}
+
+func responsesInputImageToChatImage(item map[string]any) any {
+	if item == nil {
+		return nil
+	}
+	imageURL := item["image_url"]
+	detail := strings.TrimSpace(common.Interface2String(item["detail"]))
+	if detail == "" {
+		return imageURL
+	}
+	switch v := imageURL.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v)+1)
+		for key, value := range v {
+			out[key] = value
+		}
+		out["detail"] = detail
+		return out
+	case string:
+		return map[string]any{"url": v, "detail": detail}
+	default:
+		if imageURL == nil {
+			return map[string]any{"detail": detail}
+		}
+		return map[string]any{"url": imageURL, "detail": detail}
+	}
+}
+
+func responsesInputFileToChatFile(item map[string]any) any {
+	if item == nil {
+		return nil
+	}
+	if file := item["file"]; file != nil {
+		return file
+	}
+	file := make(map[string]any)
+	for _, key := range []string{"file_id", "file_data", "filename", "file_url"} {
+		if value := item[key]; value != nil && common.Interface2String(value) != "" {
+			file[key] = value
+		}
+	}
+	if len(file) == 0 {
+		return nil
+	}
+	return file
 }
 
 func responsesToolsToIR(raw json.RawMessage) ([]ToolDefinition, error) {
@@ -724,6 +875,22 @@ func irToolChoiceToChat(choice *ToolChoice) any {
 	return choice.Raw
 }
 
+func chatImageDetail(v any) string {
+	switch vv := v.(type) {
+	case map[string]any:
+		return strings.TrimSpace(common.Interface2String(vv["detail"]))
+	case dto.MessageImageUrl:
+		return strings.TrimSpace(vv.Detail)
+	case *dto.MessageImageUrl:
+		if vv == nil {
+			return ""
+		}
+		return strings.TrimSpace(vv.Detail)
+	default:
+		return ""
+	}
+}
+
 func normalizeChatImageURLToString(v any) any {
 	switch vv := v.(type) {
 	case string:
@@ -745,6 +912,59 @@ func normalizeChatImageURLToString(v any) any {
 		return v
 	default:
 		return v
+	}
+}
+
+func chatFileFields(v any) map[string]any {
+	fields := make(map[string]any)
+	switch vv := v.(type) {
+	case map[string]any:
+		copyChatFileMapFields(fields, vv)
+	case dto.MessageFile:
+		copyChatFileStructFields(fields, &vv)
+	case *dto.MessageFile:
+		copyChatFileStructFields(fields, vv)
+	default:
+		if v == nil {
+			return fields
+		}
+		var m map[string]any
+		if raw, err := common.Marshal(v); err == nil {
+			_ = common.Unmarshal(raw, &m)
+		}
+		copyChatFileMapFields(fields, m)
+	}
+	return fields
+}
+
+func copyChatFileStructFields(fields map[string]any, file *dto.MessageFile) {
+	if file == nil {
+		return
+	}
+	if strings.TrimSpace(file.FileId) != "" {
+		fields["file_id"] = file.FileId
+	}
+	if strings.TrimSpace(file.FileData) != "" {
+		fields["file_data"] = file.FileData
+	}
+	if strings.TrimSpace(file.FileName) != "" {
+		fields["filename"] = file.FileName
+	}
+}
+
+func copyChatFileMapFields(fields map[string]any, file map[string]any) {
+	if file == nil {
+		return
+	}
+	for _, key := range []string{"file_id", "file_data", "filename", "file_url"} {
+		if value := file[key]; value != nil && common.Interface2String(value) != "" {
+			fields[key] = value
+		}
+	}
+	if _, ok := fields["filename"]; !ok {
+		if value := file["file_name"]; value != nil && common.Interface2String(value) != "" {
+			fields["filename"] = value
+		}
 	}
 }
 

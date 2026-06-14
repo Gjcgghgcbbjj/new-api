@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
@@ -58,6 +59,32 @@ func TestShouldResponsesPreferNativeForNativeResponseChannelType(t *testing.T) {
 
 	if shouldResponsesUseChatCompletionsBridge(info, openAIResponsesRequest("grok-4")) {
 		t.Fatal("expected native responses channel type to keep native responses")
+	}
+}
+
+func TestShouldUseChatCompletionsViaResponsesSkipsUnsupportedChannel(t *testing.T) {
+	settings := model_setting.GetGlobalSettings()
+	oldPolicy := settings.ChatCompletionsToResponsesPolicy
+	settings.ChatCompletionsToResponsesPolicy = model_setting.ChatCompletionsToResponsesPolicy{
+		Enabled:       true,
+		AllChannels:   true,
+		ModelPatterns: []string{`.*`},
+	}
+	defer func() {
+		settings.ChatCompletionsToResponsesPolicy = oldPolicy
+	}()
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "claude-sonnet",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelType:       constant.ChannelTypeAnthropic,
+			ChannelId:         1,
+			UpstreamModelName: "claude-sonnet",
+		},
+	}
+
+	if shouldUseChatCompletionsViaResponses(info, &responsesBridgeMockAdaptor{}) {
+		t.Fatal("expected unsupported Responses conversion channel to skip chat->responses bridge")
 	}
 }
 

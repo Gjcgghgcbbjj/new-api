@@ -158,11 +158,12 @@ func FromResponsesResponse(resp *dto.OpenAIResponsesResponse) (*Response, error)
 		return nil, errors.New("response is nil")
 	}
 	out := &Response{
-		ID:        resp.ID,
-		CreatedAt: resp.CreatedAt,
-		Model:     resp.Model,
-		Status:    common.JsonRawMessageToString(resp.Status),
-		Usage:     responsesUsageToIRUsage(resp.Usage),
+		ID:               resp.ID,
+		CreatedAt:        resp.CreatedAt,
+		Model:            resp.Model,
+		Status:           common.JsonRawMessageToString(resp.Status),
+		IncompleteReason: responsesIncompleteReason(resp.IncompleteDetails),
+		Usage:            responsesUsageToIRUsage(resp.Usage),
 	}
 	for _, item := range resp.Output {
 		switch item.Type {
@@ -229,10 +230,7 @@ func ToChatResponse(resp *Response, id string) (*dto.OpenAITextResponse, *dto.Us
 		}
 	}
 
-	finishReason := "stop"
-	if len(toolCalls) > 0 {
-		finishReason = "tool_calls"
-	}
+	finishReason := responseFinishReason(resp.Status, resp.IncompleteReason, len(toolCalls) > 0)
 	msg := dto.Message{
 		Role:    "assistant",
 		Content: text.String(),
@@ -260,6 +258,33 @@ func ToChatResponse(resp *Response, id string) (*dto.OpenAITextResponse, *dto.Us
 		Usage: *usage,
 	}
 	return out, usage, nil
+}
+
+func responsesIncompleteReason(details *dto.IncompleteDetails) string {
+	if details == nil {
+		return ""
+	}
+	if strings.TrimSpace(details.Reason) != "" {
+		return strings.TrimSpace(details.Reason)
+	}
+	return strings.TrimSpace(details.Reasoning)
+}
+
+func responseFinishReason(status string, incompleteReason string, hasToolCalls bool) string {
+	status = strings.TrimSpace(status)
+	incompleteReason = strings.TrimSpace(incompleteReason)
+	if strings.EqualFold(status, "incomplete") || incompleteReason != "" {
+		switch incompleteReason {
+		case "max_output_tokens":
+			return "length"
+		case "content_filter":
+			return "content_filter"
+		}
+	}
+	if hasToolCalls {
+		return "tool_calls"
+	}
+	return "stop"
 }
 
 func ExtractOutputTextFromResponses(resp *dto.OpenAIResponsesResponse) string {

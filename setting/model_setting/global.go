@@ -1,6 +1,7 @@
 package model_setting
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -10,14 +11,21 @@ import (
 )
 
 type ChatCompletionsToResponsesPolicy struct {
-	Enabled       bool     `json:"enabled"`
-	AllChannels   bool     `json:"all_channels"`
-	ChannelIDs    []int    `json:"channel_ids,omitempty"`
-	ChannelTypes  []int    `json:"channel_types,omitempty"`
-	ModelPatterns []string `json:"model_patterns,omitempty"`
+	Enabled         bool     `json:"enabled"`
+	AllChannels     bool     `json:"all_channels"`
+	ChannelIDs      []int    `json:"channel_ids,omitempty"`
+	ChannelTypes    []int    `json:"channel_types,omitempty"`
+	ModelPatterns   []string `json:"model_patterns,omitempty"`
+	ExcludePatterns []string `json:"exclude_patterns,omitempty"`
+	MatchTarget     string   `json:"match_target,omitempty"`
 }
 
 var policyRegexCache sync.Map // map[string]*regexp.Regexp
+
+const (
+	PolicyMatchTargetOrigin   = "origin"
+	PolicyMatchTargetUpstream = "upstream"
+)
 
 func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channelType int) bool {
 	if !p.Enabled {
@@ -37,10 +45,61 @@ func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channe
 }
 
 func (p ChatCompletionsToResponsesPolicy) IsModelEnabled(model string) bool {
+	return p.IsModelEnabledForTarget(model, "")
+}
+
+func (p ChatCompletionsToResponsesPolicy) IsModelEnabledForTarget(originModel string, upstreamModel string) bool {
+	model := p.MatchModelName(originModel, upstreamModel)
 	if !p.Enabled || strings.TrimSpace(model) == "" {
 		return false
 	}
-	for _, pattern := range p.ModelPatterns {
+	if !matchPolicyPatterns(p.ModelPatterns, model) {
+		return false
+	}
+	if matchPolicyPatterns(p.ExcludePatterns, model) {
+		return false
+	}
+	return true
+}
+
+func (p ChatCompletionsToResponsesPolicy) MatchModelName(originModel string, upstreamModel string) string {
+	if strings.EqualFold(strings.TrimSpace(p.MatchTarget), PolicyMatchTargetUpstream) {
+		if strings.TrimSpace(upstreamModel) != "" {
+			return upstreamModel
+		}
+	}
+	return originModel
+}
+
+func (p ChatCompletionsToResponsesPolicy) Validate() error {
+	if err := validatePolicyPatterns("model_patterns", p.ModelPatterns); err != nil {
+		return err
+	}
+	if err := validatePolicyPatterns("exclude_patterns", p.ExcludePatterns); err != nil {
+		return err
+	}
+	target := strings.TrimSpace(p.MatchTarget)
+	if target != "" && target != PolicyMatchTargetOrigin && target != PolicyMatchTargetUpstream {
+		return fmt.Errorf("match_target must be %q or %q", PolicyMatchTargetOrigin, PolicyMatchTargetUpstream)
+	}
+	return nil
+}
+
+func validatePolicyPatterns(field string, patterns []string) error {
+	for idx, pattern := range patterns {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+		if _, err := regexp.Compile(pattern); err != nil {
+			return fmt.Errorf("%s[%d] invalid regex %q: %w", field, idx, pattern, err)
+		}
+	}
+	return nil
+}
+
+func matchPolicyPatterns(patterns []string, model string) bool {
+	for _, pattern := range patterns {
 		pattern = strings.TrimSpace(pattern)
 		if pattern == "" {
 			continue

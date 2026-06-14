@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/console_setting"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
@@ -73,6 +74,14 @@ func buildCompletionRatioMetaValue(optionValues map[string]string) string {
 		return "{}"
 	}
 	return string(jsonBytes)
+}
+
+func validateChatCompletionsToResponsesPolicyOption(value string) error {
+	var policy model_setting.ChatCompletionsToResponsesPolicy
+	if err := common.UnmarshalJsonStr(value, &policy); err != nil {
+		return err
+	}
+	return policy.Validate()
 }
 
 func GetOptions(c *gin.Context) {
@@ -292,6 +301,15 @@ func UpdateOption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": err.Error(),
+			})
+			return
+		}
+	case "global.chat_completions_to_responses_policy", "global.responses_to_chat_completions_policy":
+		err = validateChatCompletionsToResponsesPolicyOption(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "模型转换策略设置失败: " + err.Error(),
 			})
 			return
 		}

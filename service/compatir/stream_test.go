@@ -342,6 +342,31 @@ func TestCompatIRResponsesStreamFunctionCallArgumentsDelta(t *testing.T) {
 	}
 }
 
+func TestCompatIRResponsesStreamFinishReasonFromStatus(t *testing.T) {
+	converter := NewResponsesToChatStreamConverter(ResponsesToChatStreamOptions{
+		ResponseID: "chat_1",
+		Model:      "responses-model",
+		CreatedAt:  123,
+	})
+
+	chunks := converter.ChunksFromResponsesEvent(&dto.ResponsesStreamResponse{
+		Type: "response.completed",
+		Response: &dto.OpenAIResponsesResponse{
+			CreatedAt:         123,
+			Model:             "responses-model",
+			Status:            json.RawMessage(`"incomplete"`),
+			IncompleteDetails: &dto.IncompleteDetails{Reason: "max_output_tokens"},
+		},
+	})
+	if len(chunks) != 2 {
+		t.Fatalf("completed chunks = %+v", chunks)
+	}
+	finishReason := chunks[1].Choices[0].FinishReason
+	if finishReason == nil || *finishReason != "length" {
+		t.Fatalf("finish reason = %v", finishReason)
+	}
+}
+
 func assertEventTypes(t *testing.T, events []ResponsesStreamEvent, want ...string) {
 	t.Helper()
 	if len(events) != len(want) {

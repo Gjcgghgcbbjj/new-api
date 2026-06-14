@@ -87,6 +87,41 @@ func TestOaiChatToResponsesStreamHandlerSendsStartBeforeUpstreamChunk(t *testing
 	}
 }
 
+func TestOaiChatToResponsesStreamHandlerStopsOnMalformedEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set(common.RequestIdKey, "chat-to-responses-malformed")
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	stream := strings.Join([]string{
+		`data: {"choices":[`,
+		`data: [DONE]`,
+		``,
+	}, "\n\n")
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(stream)),
+	}
+
+	usage, apiErr := OaiChatToResponsesStreamHandler(
+		ctx,
+		&relaycommon.RelayInfo{
+			ChannelMeta: &relaycommon.ChannelMeta{UpstreamModelName: "upstream-chat-model"},
+		},
+		resp,
+		&dto.OpenAIResponsesRequest{Model: "responses-model"},
+	)
+	if apiErr == nil {
+		t.Fatalf("expected malformed stream error, usage=%+v body:\n%s", usage, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "response.completed") || strings.Contains(recorder.Body.String(), "[DONE]") {
+		t.Fatalf("malformed stream should not receive normal terminal events:\n%s", recorder.Body.String())
+	}
+}
+
 func readSSEEventLine(r io.Reader, timeout time.Duration) (string, error) {
 	type result struct {
 		line string
@@ -182,6 +217,37 @@ func TestOaiResponsesToChatStreamHandlerPreservesTextAndToolCallDeltas(t *testin
 	}
 	if finishReason != "tool_calls" {
 		t.Fatalf("finish reason = %q", finishReason)
+	}
+}
+
+func TestOaiResponsesToChatStreamHandlerStopsOnMalformedEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Set(common.RequestIdKey, "responses-to-chat-malformed")
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	stream := strings.Join([]string{
+		`data: {"type":"response.created"`,
+		`data: [DONE]`,
+		``,
+	}, "\n\n")
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(stream)),
+	}
+
+	usage, apiErr := OaiResponsesToChatStreamHandler(ctx, &relaycommon.RelayInfo{
+		RelayFormat: types.RelayFormatOpenAI,
+		ChannelMeta: &relaycommon.ChannelMeta{UpstreamModelName: "responses-model"},
+	}, resp)
+	if apiErr == nil {
+		t.Fatalf("expected malformed stream error, usage=%+v body:\n%s", usage, recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "[DONE]") {
+		t.Fatalf("malformed stream should not receive normal DONE:\n%s", recorder.Body.String())
 	}
 }
 

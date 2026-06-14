@@ -69,6 +69,57 @@ func applySystemPromptIfNeeded(c *gin.Context, info *relaycommon.RelayInfo, requ
 	}
 }
 
+type openAIResponsesConversionSupporter interface {
+	SupportsOpenAIResponsesRequestConversion(info *relaycommon.RelayInfo) bool
+}
+
+func shouldUseChatCompletionsViaResponses(info *relaycommon.RelayInfo, adaptor channel.Adaptor) bool {
+	if info == nil || adaptor == nil {
+		return false
+	}
+	if supporter, ok := adaptor.(openAIResponsesConversionSupporter); ok {
+		if !supporter.SupportsOpenAIResponsesRequestConversion(info) {
+			return false
+		}
+	} else if !isOpenAIResponsesConversionCapableChannel(info.ChannelType) {
+		return false
+	}
+	return service.ShouldChatCompletionsUseResponsesGlobal(info.ChannelId, info.ChannelType, info.OriginModelName, info.UpstreamModelName)
+}
+
+func isOpenAIResponsesConversionCapableChannel(channelType int) bool {
+	switch channelType {
+	case constant.ChannelTypeAnthropic,
+		constant.ChannelTypeAws,
+		constant.ChannelTypeBaidu,
+		constant.ChannelTypeBaiduV2,
+		constant.ChannelTypeCohere,
+		constant.ChannelTypeCoze,
+		constant.ChannelTypeDeepSeek,
+		constant.ChannelTypeDify,
+		constant.ChannelTypeGemini,
+		constant.ChannelTypeJina,
+		constant.ChannelTypeJimeng,
+		constant.ChannelTypeMiniMax,
+		constant.ChannelTypeMistral,
+		constant.ChannelTypeMokaAI,
+		constant.ChannelTypeMoonshot,
+		constant.ChannelTypeOllama,
+		constant.ChannelTypePaLM,
+		constant.ChannelTypeReplicate,
+		constant.ChannelTypeSiliconFlow,
+		constant.ChannelTypeSubmodel,
+		constant.ChannelTypeTencent,
+		constant.ChannelTypeVertexAi,
+		constant.ChannelTypeXunfei,
+		constant.ChannelTypeZhipu,
+		constant.ChannelTypeZhipu_v4:
+		return false
+	default:
+		return true
+	}
+}
+
 func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, adaptor channel.Adaptor, request *dto.GeneralOpenAIRequest) (*dto.Usage, *types.NewAPIError) {
 	chatJSON, err := common.Marshal(request)
 	if err != nil {

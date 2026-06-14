@@ -134,7 +134,8 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		var streamResp dto.ResponsesStreamResponse
 		if err := common.UnmarshalJsonStr(data, &streamResp); err != nil {
 			logger.LogError(c, "failed to unmarshal responses stream event: "+err.Error())
-			sr.Error(err)
+			streamErr = types.NewOpenAIError(fmt.Errorf("failed to unmarshal responses stream event: %w", err), types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+			sr.Stop(streamErr)
 			return
 		}
 

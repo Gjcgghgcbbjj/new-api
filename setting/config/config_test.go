@@ -10,6 +10,15 @@ type testConfigWithMap struct {
 	Name  string            `json:"name"`
 }
 
+type testConfigWithStruct struct {
+	Policy testNestedPolicy `json:"policy"`
+}
+
+type testNestedPolicy struct {
+	Enabled       bool     `json:"enabled"`
+	ModelPatterns []string `json:"model_patterns,omitempty"`
+}
+
 func TestUpdateConfigFromMap_MapReplacement(t *testing.T) {
 	cfg := &testConfigWithMap{
 		Modes: map[string]string{
@@ -92,5 +101,28 @@ func TestUpdateConfigFromMap_ScalarFieldsUnchanged(t *testing.T) {
 	// modes was not in configMap, should remain unchanged
 	if cfg.Modes["m"] != "v" {
 		t.Errorf("Modes should be unchanged, got %v", cfg.Modes)
+	}
+}
+
+func TestUpdateConfigFromMap_EmptyStructClearsOldFields(t *testing.T) {
+	cfg := &testConfigWithStruct{
+		Policy: testNestedPolicy{
+			Enabled:       true,
+			ModelPatterns: []string{`^gpt-5`},
+		},
+	}
+
+	err := UpdateConfigFromMap(cfg, map[string]string{
+		"policy": `{}`,
+	})
+	if err != nil {
+		t.Fatalf("UpdateConfigFromMap failed: %v", err)
+	}
+
+	if cfg.Policy.Enabled {
+		t.Fatalf("Policy.Enabled should be false after {}, got %+v", cfg.Policy)
+	}
+	if len(cfg.Policy.ModelPatterns) != 0 {
+		t.Fatalf("Policy.ModelPatterns should be empty after {}, got %+v", cfg.Policy)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 )
 
@@ -293,6 +294,8 @@ type ResponsesToChatStreamConverter struct {
 	responseID string
 	model      string
 	createdAt  int64
+	status     string
+	reason     string
 
 	usage     *dto.Usage
 	usageText strings.Builder
@@ -395,10 +398,7 @@ func (c *ResponsesToChatStreamConverter) StopChunks() []*dto.ChatCompletionsStre
 		return nil
 	}
 	chunks := c.StartChunks()
-	finishReason := "stop"
-	if c.sawToolCall {
-		finishReason = "tool_calls"
-	}
+	finishReason := responseFinishReason(c.status, c.reason, c.sawToolCall)
 	chunks = append(chunks, &dto.ChatCompletionsStreamResponse{
 		Id:      c.responseID,
 		Object:  "chat.completion.chunk",
@@ -465,6 +465,12 @@ func (c *ResponsesToChatStreamConverter) updateFromResponsesResponse(resp *dto.O
 	}
 	if resp.CreatedAt != 0 {
 		c.createdAt = int64(resp.CreatedAt)
+	}
+	if status := common.JsonRawMessageToString(resp.Status); status != "" {
+		c.status = status
+	}
+	if reason := responsesIncompleteReason(resp.IncompleteDetails); reason != "" {
+		c.reason = reason
 	}
 	if resp.Usage != nil {
 		c.usage = responsesStreamUsageToChatUsage(resp.Usage)

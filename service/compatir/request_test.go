@@ -109,6 +109,106 @@ func TestCompatIRChatRequestToResponsesRequest(t *testing.T) {
 	}
 }
 
+func TestCompatIRChatRequestConvertsLegacyFunctionsAndFunctionCall(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		Model:    "chat-model",
+		Messages: []dto.Message{{Role: "user", Content: "hello"}},
+		Functions: json.RawMessage(`[
+			{"name":"lookup","description":"lookup data","parameters":{"type":"object"}}
+		]`),
+		FunctionCall: json.RawMessage(`{"name":"lookup"}`),
+	}
+
+	ir, err := FromChatRequest(req)
+	if err != nil {
+		t.Fatalf("FromChatRequest error: %v", err)
+	}
+	responsesReq, err := ToResponsesRequest(ir)
+	if err != nil {
+		t.Fatalf("ToResponsesRequest error: %v", err)
+	}
+
+	var tools []map[string]any
+	if err := json.Unmarshal(responsesReq.Tools, &tools); err != nil {
+		t.Fatalf("tools json: %v", err)
+	}
+	if len(tools) != 1 || tools[0]["type"] != ToolTypeFunction || tools[0]["name"] != "lookup" {
+		t.Fatalf("tools = %+v", tools)
+	}
+
+	var toolChoice map[string]any
+	if err := json.Unmarshal(responsesReq.ToolChoice, &toolChoice); err != nil {
+		t.Fatalf("tool_choice json: %v", err)
+	}
+	if toolChoice["type"] != ToolTypeFunction || toolChoice["name"] != "lookup" {
+		t.Fatalf("tool_choice = %+v", toolChoice)
+	}
+}
+
+func TestCompatIRChatRequestRejectsUnsupportedFields(t *testing.T) {
+	req := &dto.GeneralOpenAIRequest{
+		Model:    "chat-model",
+		Messages: []dto.Message{{Role: "user", Content: "hello"}},
+		Stop:     []any{"\n"},
+	}
+	if _, err := FromChatRequest(req); err == nil {
+		t.Fatal("expected stop to be rejected")
+	}
+
+	req.Stop = nil
+	req.FunctionCall = json.RawMessage(`"lookup"`)
+	if _, err := FromChatRequest(req); err == nil {
+		t.Fatal("expected unsupported function_call to be rejected")
+	}
+}
+
+func TestCompatIRChatRequestToResponsesPreservesImageDetailAndFileFields(t *testing.T) {
+	msg := dto.Message{Role: "user"}
+	msg.SetMediaContent([]dto.MediaContent{
+		{Type: dto.ContentTypeText, Text: "inspect"},
+		{Type: dto.ContentTypeImageURL, ImageUrl: &dto.MessageImageUrl{Url: "https://example.test/a.png", Detail: "low"}},
+		{Type: dto.ContentTypeFile, File: map[string]any{
+			"file_id":   "file_123",
+			"file_data": "data:application/pdf;base64,AAAA",
+			"filename":  "a.pdf",
+			"file_url":  "https://example.test/a.pdf",
+		}},
+	})
+	req := &dto.GeneralOpenAIRequest{
+		Model:    "chat-model",
+		Messages: []dto.Message{msg},
+	}
+
+	ir, err := FromChatRequest(req)
+	if err != nil {
+		t.Fatalf("FromChatRequest error: %v", err)
+	}
+	responsesReq, err := ToResponsesRequest(ir)
+	if err != nil {
+		t.Fatalf("ToResponsesRequest error: %v", err)
+	}
+
+	var input []map[string]any
+	if err := json.Unmarshal(responsesReq.Input, &input); err != nil {
+		t.Fatalf("input json: %v", err)
+	}
+	content, ok := input[0]["content"].([]any)
+	if !ok {
+		t.Fatalf("content = %+v", input[0]["content"])
+	}
+	image, _ := content[1].(map[string]any)
+	if image["type"] != "input_image" || image["image_url"] != "https://example.test/a.png" || image["detail"] != "low" {
+		t.Fatalf("image part = %+v", image)
+	}
+	file, _ := content[2].(map[string]any)
+	if file["type"] != "input_file" || file["file_id"] != "file_123" || file["file_data"] == "" || file["filename"] != "a.pdf" || file["file_url"] == "" {
+		t.Fatalf("file part = %+v", file)
+	}
+	if _, nested := file["file"]; nested {
+		t.Fatalf("input_file should not use nested file object: %+v", file)
+	}
+}
+
 func TestCompatIRResponsesRequestToChatRequest(t *testing.T) {
 	stream := true
 	req := &dto.OpenAIResponsesRequest{

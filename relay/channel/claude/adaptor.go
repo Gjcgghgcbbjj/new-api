@@ -112,6 +112,10 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 	return nil, errors.New("not implemented")
 }
 
+func (a *Adaptor) SupportsOpenAIResponsesRequestConversion(info *relaycommon.RelayInfo) bool {
+	return false
+}
+
 func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
 	return channel.DoApiRequest(a, c, info, requestBody)
 }

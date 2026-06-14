@@ -261,11 +261,17 @@ func updateConfigFromMap(config interface{}, configMap map[string]string) error 
 				continue
 			}
 			field.Set(fresh.Elem())
-		case reflect.Slice, reflect.Struct:
+		case reflect.Slice:
 			err := json.Unmarshal([]byte(strValue), field.Addr().Interface())
 			if err != nil {
 				continue
 			}
+		case reflect.Struct:
+			fresh := reflect.New(field.Type())
+			if err := json.Unmarshal([]byte(strValue), fresh.Interface()); err != nil {
+				continue
+			}
+			field.Set(fresh.Elem())
 		}
 	}
 

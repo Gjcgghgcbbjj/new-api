@@ -54,13 +54,14 @@ func (r *Request) AddWarning(code WarningCode, field string, message string) {
 }
 
 type Response struct {
-	ID        string
-	CreatedAt int
-	Model     string
-	Status    string
-	Output    []OutputItem
-	Usage     *dto.Usage
-	Warnings  []ConversionWarning
+	ID               string
+	CreatedAt        int
+	Model            string
+	Status           string
+	IncompleteReason string
+	Output           []OutputItem
+	Usage            *dto.Usage
+	Warnings         []ConversionWarning
 }
 
 func (r *Response) AddWarning(code WarningCode, field string, message string) {

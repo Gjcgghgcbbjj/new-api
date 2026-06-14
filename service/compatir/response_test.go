@@ -146,3 +146,72 @@ func TestCompatIRResponsesResponseToChatResponseToolOnly(t *testing.T) {
 		t.Fatalf("tool calls = %+v", choice.Message.ParseToolCalls())
 	}
 }
+
+func TestCompatIRResponsesResponseToChatFinishReasonFromStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     json.RawMessage
+		reason     string
+		output     []dto.ResponsesOutput
+		wantReason string
+	}{
+		{
+			name:       "max output tokens",
+			status:     json.RawMessage(`"incomplete"`),
+			reason:     "max_output_tokens",
+			wantReason: "length",
+		},
+		{
+			name:       "content filter",
+			status:     json.RawMessage(`"incomplete"`),
+			reason:     "content_filter",
+			wantReason: "content_filter",
+		},
+		{
+			name:   "tool calls",
+			status: json.RawMessage(`"completed"`),
+			output: []dto.ResponsesOutput{
+				{
+					Type:      OutputTypeFunctionCall,
+					ID:        "fc_1",
+					CallId:    "call_1",
+					Name:      "get_weather",
+					Arguments: json.RawMessage(`{}`),
+				},
+			},
+			wantReason: "tool_calls",
+		},
+		{
+			name:       "default stop",
+			status:     json.RawMessage(`"completed"`),
+			wantReason: "stop",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := &dto.OpenAIResponsesResponse{
+				ID:        "resp_1",
+				CreatedAt: 123,
+				Model:     "responses-model",
+				Status:    tt.status,
+				Output:    tt.output,
+			}
+			if tt.reason != "" {
+				resp.IncompleteDetails = &dto.IncompleteDetails{Reason: tt.reason}
+			}
+
+			ir, err := FromResponsesResponse(resp)
+			if err != nil {
+				t.Fatalf("FromResponsesResponse error: %v", err)
+			}
+			chatResp, _, err := ToChatResponse(ir, "chat_1")
+			if err != nil {
+				t.Fatalf("ToChatResponse error: %v", err)
+			}
+			if got := chatResp.Choices[0].FinishReason; got != tt.wantReason {
+				t.Fatalf("finish_reason = %q, want %q", got, tt.wantReason)
+			}
+		})
+	}
+}
