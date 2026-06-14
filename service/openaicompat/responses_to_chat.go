@@ -1,9 +1,11 @@
 package openaicompat
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 )
 
@@ -42,34 +44,29 @@ func ResponsesResponseToChatCompletionsResponse(resp *dto.OpenAIResponsesRespons
 	created := resp.CreatedAt
 
 	var toolCalls []dto.ToolCallResponse
-	if text == "" && len(resp.Output) > 0 {
-		for _, out := range resp.Output {
-			if out.Type != "function_call" {
-				continue
-			}
-			name := strings.TrimSpace(out.Name)
-			if name == "" {
-				continue
-			}
-			callId := strings.TrimSpace(out.CallId)
-			if callId == "" {
-				callId = strings.TrimSpace(out.ID)
-			}
-			toolCalls = append(toolCalls, dto.ToolCallResponse{
-				ID:   callId,
-				Type: "function",
-				Function: dto.FunctionResponse{
-					Name:      name,
-					Arguments: out.ArgumentsString(),
-				},
-			})
+	for _, out := range resp.Output {
+		if out.Type != "function_call" {
+			continue
 		}
+		name := strings.TrimSpace(out.Name)
+		if name == "" {
+			continue
+		}
+		callId := strings.TrimSpace(out.CallId)
+		if callId == "" {
+			callId = strings.TrimSpace(out.ID)
+		}
+		toolCalls = append(toolCalls, dto.ToolCallResponse{
+			ID:   callId,
+			Type: "function",
+			Function: dto.FunctionResponse{
+				Name:      name,
+				Arguments: out.ArgumentsString(),
+			},
+		})
 	}
 
-	finishReason := "stop"
-	if len(toolCalls) > 0 {
-		finishReason = "tool_calls"
-	}
+	finishReason := ResponsesFinishReason(resp, len(toolCalls) > 0)
 
 	msg := dto.Message{
 		Role:    "assistant",
@@ -77,7 +74,6 @@ func ResponsesResponseToChatCompletionsResponse(resp *dto.OpenAIResponsesRespons
 	}
 	if len(toolCalls) > 0 {
 		msg.SetToolCalls(toolCalls)
-		msg.Content = ""
 	}
 
 	out := &dto.OpenAITextResponse{
@@ -96,6 +92,92 @@ func ResponsesResponseToChatCompletionsResponse(resp *dto.OpenAIResponsesRespons
 	}
 
 	return out, usage, nil
+}
+
+func ResponsesFinishReason(resp *dto.OpenAIResponsesResponse, hasToolCalls bool) string {
+	status := responsesStatus(resp)
+	incompleteReason := ResponsesIncompleteReason(resp)
+	if status == "incomplete" || incompleteReason != "" {
+		switch incompleteReason {
+		case "max_output_tokens":
+			return "length"
+		case "content_filter":
+			return "content_filter"
+		}
+	}
+	if hasToolCalls {
+		return "tool_calls"
+	}
+	return "stop"
+}
+
+func ResponsesIncompleteReason(resp *dto.OpenAIResponsesResponse) string {
+	if resp == nil || resp.IncompleteDetails == nil {
+		return ""
+	}
+	return strings.TrimSpace(resp.IncompleteDetails.Reasoning)
+}
+
+func ApplyResponsesIncompleteReasonFromJSON(resp *dto.OpenAIResponsesResponse, data []byte) {
+	if resp == nil {
+		return
+	}
+	reason := extractResponsesIncompleteReasonFromJSON(data)
+	if reason == "" {
+		return
+	}
+	if resp.IncompleteDetails == nil {
+		resp.IncompleteDetails = &dto.IncompleteDetails{}
+	}
+	resp.IncompleteDetails.Reasoning = reason
+}
+
+func responsesStatus(resp *dto.OpenAIResponsesResponse) string {
+	if resp == nil || len(resp.Status) == 0 {
+		return ""
+	}
+	switch common.GetJsonType(resp.Status) {
+	case "string":
+		var status string
+		if err := common.Unmarshal(resp.Status, &status); err == nil {
+			return strings.TrimSpace(status)
+		}
+	case "object":
+		var statusObj map[string]any
+		if err := common.Unmarshal(resp.Status, &statusObj); err == nil {
+			return strings.TrimSpace(common.Interface2String(statusObj["status"]))
+		}
+	}
+	return strings.Trim(strings.TrimSpace(string(resp.Status)), `"`)
+}
+
+func extractResponsesIncompleteReasonFromJSON(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	var root map[string]json.RawMessage
+	if err := common.Unmarshal(data, &root); err != nil {
+		return ""
+	}
+	if reason := extractIncompleteReasonRaw(root["incomplete_details"]); reason != "" {
+		return reason
+	}
+	var response map[string]json.RawMessage
+	if err := common.Unmarshal(root["response"], &response); err != nil {
+		return ""
+	}
+	return extractIncompleteReasonRaw(response["incomplete_details"])
+}
+
+func extractIncompleteReasonRaw(raw json.RawMessage) string {
+	if len(raw) == 0 || common.GetJsonType(raw) == "null" {
+		return ""
+	}
+	var details map[string]any
+	if err := common.Unmarshal(raw, &details); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(common.Interface2String(details["reason"]))
 }
 
 func ExtractOutputTextFromResponses(resp *dto.OpenAIResponsesResponse) string {

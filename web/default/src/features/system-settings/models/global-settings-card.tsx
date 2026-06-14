@@ -58,7 +58,9 @@ const chatToResponsesPolicyExample = JSON.stringify(
     enabled: true,
     all_channels: false,
     channel_ids: [1, 2],
-    model_patterns: ['^gpt-4o.*$', '^gpt-5.*$'],
+    model_patterns: ['^gpt-4o$', '^gpt-4o-mini$', '^gpt-5.*$'],
+    exclude_patterns: ['audio', 'realtime', 'search', 'tts', 'transcribe'],
+    match_target: 'origin',
   },
   null,
   2
@@ -68,7 +70,8 @@ const chatToResponsesPolicyAllChannelsExample = JSON.stringify(
   {
     enabled: true,
     all_channels: true,
-    model_patterns: ['^gpt-4o.*$', '^gpt-5.*$'],
+    model_patterns: ['^gpt-4o$', '^gpt-4o-mini$', '^gpt-5.*$'],
+    exclude_patterns: ['audio', 'realtime', 'search', 'tts', 'transcribe'],
   },
   null,
   2
@@ -85,11 +88,46 @@ const jsonString = z.string().refine((value) => {
   }
 }, 'Invalid JSON format')
 
+const chatToResponsesPolicyJsonString = jsonString.superRefine((value, ctx) => {
+  const trimmed = value.trim()
+  if (!trimmed) return
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    return
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
+
+  const policy = parsed as Record<string, unknown>
+  const patternFields = ['model_patterns', 'exclude_patterns'] as const
+
+  for (const field of patternFields) {
+    const patterns = policy[field]
+    if (!Array.isArray(patterns)) continue
+
+    for (const pattern of patterns) {
+      if (typeof pattern !== 'string') continue
+      try {
+        new RegExp(pattern)
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Invalid regex',
+        })
+        return
+      }
+    }
+  }
+})
+
 const schema = z.object({
   global: z.object({
     pass_through_request_enabled: z.boolean(),
     thinking_model_blacklist: jsonString,
-    chat_completions_to_responses_policy: jsonString,
+    chat_completions_to_responses_policy: chatToResponsesPolicyJsonString,
   }),
   general_setting: z.object({
     ping_interval_enabled: z.boolean(),
@@ -297,6 +335,14 @@ export function GlobalSettingsCard({ defaultValues }: GlobalSettingsCardProps) {
                   </FormControl>
                   <FormDescription>
                     {t('Empty value will be saved as {}.')}
+                    <br />
+                    {t(
+                      'exclude_patterns: blacklist regex patterns; matching models will not be converted.'
+                    )}
+                    <br />
+                    {t(
+                      'match_target: origin uses the original model name; upstream uses the mapped upstream model name.'
+                    )}
                   </FormDescription>
                   <div className='flex flex-wrap gap-2'>
                     <Button

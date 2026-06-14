@@ -1,11 +1,24 @@
 package openaicompat
 
 import (
+	"fmt"
 	"regexp"
 	"sync"
 )
 
 var compiledRegexCache sync.Map // map[string]*regexp.Regexp
+
+func ValidateRegexPatterns(patterns []string) error {
+	for _, pattern := range patterns {
+		if pattern == "" {
+			continue
+		}
+		if _, err := regexp.Compile(pattern); err != nil {
+			return fmt.Errorf("invalid regex pattern %q: %w", pattern, err)
+		}
+	}
+	return nil
+}
 
 func matchAnyRegex(patterns []string, s string) bool {
 	if len(patterns) == 0 || s == "" {

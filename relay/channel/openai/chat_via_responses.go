@@ -13,6 +13,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/openaicompat"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -54,6 +55,7 @@ func OaiResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	if err := common.Unmarshal(body, &responsesResp); err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+	openaicompat.ApplyResponsesIncompleteReasonFromJSON(&responsesResp, body)
 
 	if oaiError := responsesResp.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
@@ -108,6 +110,7 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		sentStart   bool
 		sentStop    bool
 		sawToolCall bool
+		finalResp   *dto.OpenAIResponsesResponse
 		streamErr   *types.NewAPIError
 	)
 
@@ -234,10 +237,6 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		if callID == "" {
 			return true
 		}
-		if outputText.Len() > 0 {
-			// Prefer streaming assistant text over tool calls to match non-stream behavior.
-			return true
-		}
 		if !sendStartIfNeeded() {
 			return false
 		}
@@ -305,8 +304,12 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		var streamResp dto.ResponsesStreamResponse
 		if err := common.UnmarshalJsonStr(data, &streamResp); err != nil {
 			logger.LogError(c, "failed to unmarshal responses stream event: "+err.Error())
-			sr.Error(err)
+			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+			sr.Stop(streamErr)
 			return
+		}
+		if streamResp.Response != nil {
+			openaicompat.ApplyResponsesIncompleteReasonFromJSON(streamResp.Response, []byte(data))
 		}
 
 		switch streamResp.Type {
@@ -444,6 +447,7 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 
 		case "response.completed":
 			if streamResp.Response != nil {
+				finalResp = streamResp.Response
 				if streamResp.Response.Model != "" {
 					model = streamResp.Response.Model
 				}
@@ -483,10 +487,7 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 				if info.RelayFormat == types.RelayFormatClaude && info.ClaudeConvertInfo != nil {
 					info.ClaudeConvertInfo.Usage = usage
 				}
-				finishReason := "stop"
-				if sawToolCall && outputText.Len() == 0 {
-					finishReason = "tool_calls"
-				}
+				finishReason := openaicompat.ResponsesFinishReason(streamResp.Response, sawToolCall)
 				stop := helper.GenerateStopResponse(responseId, createAt, model, finishReason)
 				if !sendChatChunk(stop) {
 					sr.Stop(streamErr)
@@ -528,10 +529,7 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 		if info.RelayFormat == types.RelayFormatClaude && info.ClaudeConvertInfo != nil {
 			info.ClaudeConvertInfo.Usage = usage
 		}
-		finishReason := "stop"
-		if sawToolCall && outputText.Len() == 0 {
-			finishReason = "tool_calls"
-		}
+		finishReason := openaicompat.ResponsesFinishReason(finalResp, sawToolCall)
 		stop := helper.GenerateStopResponse(responseId, createAt, model, finishReason)
 		if !sendChatChunk(stop) {
 			return nil, streamErr
