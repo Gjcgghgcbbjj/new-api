@@ -1,19 +1,43 @@
 package openaicompat
 
-import "github.com/QuantumNous/new-api/setting/model_setting"
+import (
+	"github.com/QuantumNous/new-api/constant"
+)
 
-func ShouldChatCompletionsUseResponsesPolicy(policy model_setting.ChatCompletionsToResponsesPolicy, channelID int, channelType int, model string) bool {
+type chatCompletionsToResponsesPolicy interface {
+	IsChannelEnabled(channelID int, channelType int) bool
+	GetModelPatterns() []string
+	GetExcludePatterns() []string
+	GetMatchTarget() string
+}
+
+func SupportsResponsesConversion(channelType int) bool {
+	switch channelType {
+	case constant.ChannelTypeOpenAI,
+		constant.ChannelTypeAzure,
+		constant.ChannelTypeAli,
+		constant.ChannelCloudflare,
+		constant.ChannelTypePerplexity,
+		constant.ChannelTypeVolcEngine,
+		constant.ChannelTypeXai,
+		constant.ChannelTypeCodex:
+		return true
+	default:
+		return false
+	}
+}
+
+func ShouldChatCompletionsUseResponsesPolicy(policy chatCompletionsToResponsesPolicy, channelID int, channelType int, originModel string, upstreamModel ...string) bool {
 	if !policy.IsChannelEnabled(channelID, channelType) {
 		return false
 	}
-	return matchAnyRegex(policy.ModelPatterns, model)
+	model := policyMatchModel(policy.GetMatchTarget(), originModel, upstreamModel...)
+	return matchAnyRegex(policy.GetModelPatterns(), model) && !matchAnyRegex(policy.GetExcludePatterns(), model)
 }
 
-func ShouldChatCompletionsUseResponsesGlobal(channelID int, channelType int, model string) bool {
-	return ShouldChatCompletionsUseResponsesPolicy(
-		model_setting.GetGlobalSettings().ChatCompletionsToResponsesPolicy,
-		channelID,
-		channelType,
-		model,
-	)
+func policyMatchModel(matchTarget string, originModel string, upstreamModel ...string) string {
+	if matchTarget == "upstream" && len(upstreamModel) > 0 && upstreamModel[0] != "" {
+		return upstreamModel[0]
+	}
+	return originModel
 }

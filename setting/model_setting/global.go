@@ -1,18 +1,23 @@
 package model_setting
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/service/openaicompat"
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
 type ChatCompletionsToResponsesPolicy struct {
-	Enabled       bool     `json:"enabled"`
-	AllChannels   bool     `json:"all_channels"`
-	ChannelIDs    []int    `json:"channel_ids,omitempty"`
-	ChannelTypes  []int    `json:"channel_types,omitempty"`
-	ModelPatterns []string `json:"model_patterns,omitempty"`
+	Enabled         bool     `json:"enabled"`
+	AllChannels     bool     `json:"all_channels"`
+	ChannelIDs      []int    `json:"channel_ids,omitempty"`
+	ChannelTypes    []int    `json:"channel_types,omitempty"`
+	ModelPatterns   []string `json:"model_patterns,omitempty"`
+	ExcludePatterns []string `json:"exclude_patterns,omitempty"`
+	MatchTarget     string   `json:"match_target,omitempty"`
 }
 
 func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channelType int) bool {
@@ -30,6 +35,36 @@ func (p ChatCompletionsToResponsesPolicy) IsChannelEnabled(channelID int, channe
 		return true
 	}
 	return false
+}
+
+func (p ChatCompletionsToResponsesPolicy) GetModelPatterns() []string {
+	return p.ModelPatterns
+}
+
+func (p ChatCompletionsToResponsesPolicy) GetExcludePatterns() []string {
+	return p.ExcludePatterns
+}
+
+func (p ChatCompletionsToResponsesPolicy) GetMatchTarget() string {
+	return p.MatchTarget
+}
+
+func ValidateChatCompletionsToResponsesPolicyJSON(value string) error {
+	var policy ChatCompletionsToResponsesPolicy
+	if err := common.UnmarshalJsonStr(value, &policy); err != nil {
+		return err
+	}
+	return ValidateChatCompletionsToResponsesPolicy(policy)
+}
+
+func ValidateChatCompletionsToResponsesPolicy(policy ChatCompletionsToResponsesPolicy) error {
+	if err := openaicompat.ValidateRegexPatterns(policy.ModelPatterns); err != nil {
+		return fmt.Errorf("invalid model_patterns: %w", err)
+	}
+	if err := openaicompat.ValidateRegexPatterns(policy.ExcludePatterns); err != nil {
+		return fmt.Errorf("invalid exclude_patterns: %w", err)
+	}
+	return nil
 }
 
 type GlobalSettings struct {
