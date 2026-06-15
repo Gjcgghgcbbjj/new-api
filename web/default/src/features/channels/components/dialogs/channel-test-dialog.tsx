@@ -108,6 +108,10 @@ const endpointTypeOptions: Array<{ value: string; label: string }> = [
   { value: 'openai', label: 'OpenAI (/v1/chat/completions)' },
   { value: 'openai-response', label: 'OpenAI Responses (/v1/responses)' },
   {
+    value: 'openai-response-via-chat',
+    label: 'OpenAI Responses via Chat (/v1/responses)',
+  },
+  {
     value: 'openai-response-compact',
     label: 'OpenAI Response Compaction (/v1/responses/compact)',
   },

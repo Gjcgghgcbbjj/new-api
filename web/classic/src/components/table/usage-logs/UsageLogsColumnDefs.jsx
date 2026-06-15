@@ -444,7 +444,24 @@ function getEntryInterfaceDisplay(other, t) {
     return null;
   }
 
-  const chainText = chain.length > 1 ? chain.join(' -> ') : t('原生格式');
+  const normalizedUpstreamPath = upstreamPath.split('?')[0];
+  const chainText =
+    chain.length > 1
+      ? chain
+          .map((item) => {
+            if (
+              item === 'OpenAI Compatible' &&
+              normalizedUpstreamPath === '/v1/chat/completions'
+            ) {
+              return t('OpenAI Chat Completions');
+            }
+            if (item === 'OpenAI Responses') {
+              return t('OpenAI Responses');
+            }
+            return item;
+          })
+          .join(' -> ')
+      : t('原生格式');
   const tooltipParts = [];
   tooltipParts.push(`${t('入口接口')}：${requestPath}`);
   tooltipParts.push(`${t('上游接口')}：${upstreamPath}`);

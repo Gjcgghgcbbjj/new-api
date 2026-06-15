@@ -3648,6 +3648,12 @@
     "并确认自行承担部署": "confirm that I bear legal responsibility arising from deployment",
     "运营和收费行为产生的法律责任": "operation and charging behavior",
     "，": ", ",
-    "、": ", "
+    "、": ", ",
+    "OpenAI Chat Completions": "OpenAIチャット補完",
+    "OpenAI Responses": "OpenAIレスポンス",
+    "OpenAI Responses via Chat (/v1/responses)": "Chat経由のOpenAIレスポンス（/v1/responses）",
+    "入口接口": "入口インターフェース",
+    "上游接口": "上流インターフェース",
+    "转换过程": "変換プロセス"
   }
 }

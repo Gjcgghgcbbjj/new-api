@@ -97,6 +97,27 @@ function DetailRow(props: {
   )
 }
 
+function formatRequestConversionChain(
+  conversionChain: string[],
+  upstreamPath: string,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  if (conversionChain.length <= 1) return t('Native format')
+  const normalizedUpstreamPath = upstreamPath.split('?')[0]
+  return conversionChain
+    .map((item) => {
+      if (
+        item === 'OpenAI Compatible' &&
+        normalizedUpstreamPath === '/v1/chat/completions'
+      ) {
+        return t('OpenAI Chat Completions')
+      }
+      if (item === 'OpenAI Responses') return t('OpenAI Responses')
+      return item
+    })
+    .join(' -> ')
+}
+
 function DetailSection(props: {
   icon?: React.ReactNode
   label: string
@@ -470,12 +491,13 @@ export function DetailsDialog(props: DetailsDialogProps) {
     other && Array.isArray(other.request_conversion)
       ? other.request_conversion.filter(Boolean)
       : []
-  const conversionLabel =
-    conversionChain.length <= 1
-      ? t('Native format')
-      : conversionChain.join(' -> ')
   const requestPath = other?.request_path || ''
   const upstreamPath = other?.upstream_request_path || requestPath
+  const conversionLabel = formatRequestConversionChain(
+    conversionChain,
+    upstreamPath,
+    t
+  )
   const requestProcessText = [
     `${t('Entry Interface')}: ${requestPath || '-'}`,
     `${t('Upstream Interface')}: ${upstreamPath || '-'}`,

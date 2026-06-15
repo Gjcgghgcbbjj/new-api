@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -79,4 +80,18 @@ func TestResolveChannelTestUserIDUsesRequestUser(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, 2, userID)
+}
+
+func TestChannelTestOpenAIResponseViaChatUsesResponsesRelayFormat(t *testing.T) {
+	relayFormat := resolveChannelTestRelayFormat(string(constant.EndpointTypeOpenAIResponseViaChat), "/v1/responses")
+
+	require.Equal(t, types.RelayFormat(types.RelayFormatOpenAIResponses), relayFormat)
+}
+
+func TestBuildTestRequestOpenAIResponseViaChatUsesResponsesRequest(t *testing.T) {
+	request := buildTestRequest("chat-only-model", string(constant.EndpointTypeOpenAIResponseViaChat), nil, false)
+
+	responsesRequest, ok := request.(*dto.OpenAIResponsesRequest)
+	require.True(t, ok)
+	require.Equal(t, "chat-only-model", responsesRequest.Model)
 }

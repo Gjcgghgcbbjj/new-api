@@ -84,6 +84,10 @@ const ModelTestModal = ({
     { value: 'openai', label: 'OpenAI (/v1/chat/completions)' },
     { value: 'openai-response', label: 'OpenAI Response (/v1/responses)' },
     {
+      value: 'openai-response-via-chat',
+      label: t('OpenAI Responses via Chat (/v1/responses)'),
+    },
+    {
       value: 'openai-response-compact',
       label: 'OpenAI Response Compaction (/v1/responses/compact)',
     },

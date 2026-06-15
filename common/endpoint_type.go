@@ -2,6 +2,15 @@ package common
 
 import "github.com/QuantumNous/new-api/constant"
 
+func IsResponsesViaChatBridgeCapableChannel(channelType int) bool {
+	switch channelType {
+	case constant.ChannelTypeOpenAI, constant.ChannelTypeOpenRouter, constant.ChannelTypeXinference:
+		return true
+	default:
+		return false
+	}
+}
+
 // GetEndpointTypesByChannelType 获取渠道最优先端点类型（所有的渠道都支持 OpenAI 端点）
 func GetEndpointTypesByChannelType(channelType int, modelName string) []constant.EndpointType {
 	var endpointTypes []constant.EndpointType

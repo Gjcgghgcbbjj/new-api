@@ -57,6 +57,54 @@ func normalizeChannelTestEndpoint(channel *model.Channel, modelName, endpointTyp
 	return normalized
 }
 
+func resolveChannelTestRelayFormat(endpointType string, requestPath string) types.RelayFormat {
+	if endpointType != "" {
+		switch constant.EndpointType(endpointType) {
+		case constant.EndpointTypeOpenAI:
+			return types.RelayFormatOpenAI
+		case constant.EndpointTypeOpenAIResponse, constant.EndpointTypeOpenAIResponseViaChat:
+			return types.RelayFormatOpenAIResponses
+		case constant.EndpointTypeOpenAIResponseCompact:
+			return types.RelayFormatOpenAIResponsesCompaction
+		case constant.EndpointTypeAnthropic:
+			return types.RelayFormatClaude
+		case constant.EndpointTypeGemini:
+			return types.RelayFormatGemini
+		case constant.EndpointTypeJinaRerank:
+			return types.RelayFormatRerank
+		case constant.EndpointTypeImageGeneration:
+			return types.RelayFormatOpenAIImage
+		case constant.EndpointTypeEmbeddings:
+			return types.RelayFormatEmbedding
+		default:
+			return types.RelayFormatOpenAI
+		}
+	}
+
+	if requestPath == "/v1/embeddings" {
+		return types.RelayFormatEmbedding
+	}
+	if requestPath == "/v1/images/generations" {
+		return types.RelayFormatOpenAIImage
+	}
+	if requestPath == "/v1/messages" {
+		return types.RelayFormatClaude
+	}
+	if strings.Contains(requestPath, "/v1beta/models") {
+		return types.RelayFormatGemini
+	}
+	if requestPath == "/v1/rerank" || requestPath == "/rerank" {
+		return types.RelayFormatRerank
+	}
+	if requestPath == "/v1/responses" {
+		return types.RelayFormatOpenAIResponses
+	}
+	if strings.HasPrefix(requestPath, "/v1/responses/compact") {
+		return types.RelayFormatOpenAIResponsesCompaction
+	}
+	return types.RelayFormatOpenAI
+}
+
 func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	if c != nil {
 		if userID := c.GetInt("id"); userID > 0 {
@@ -187,54 +235,7 @@ func testChannel(channel *model.Channel, testUserID int, testModel string, endpo
 	}
 
 	// Determine relay format based on endpoint type or request path
-	var relayFormat types.RelayFormat
-	if endpointType != "" {
-		// 根据指定的端点类型设置 relayFormat
-		switch constant.EndpointType(endpointType) {
-		case constant.EndpointTypeOpenAI:
-			relayFormat = types.RelayFormatOpenAI
-		case constant.EndpointTypeOpenAIResponse:
-			relayFormat = types.RelayFormatOpenAIResponses
-		case constant.EndpointTypeOpenAIResponseCompact:
-			relayFormat = types.RelayFormatOpenAIResponsesCompaction
-		case constant.EndpointTypeAnthropic:
-			relayFormat = types.RelayFormatClaude
-		case constant.EndpointTypeGemini:
-			relayFormat = types.RelayFormatGemini
-		case constant.EndpointTypeJinaRerank:
-			relayFormat = types.RelayFormatRerank
-		case constant.EndpointTypeImageGeneration:
-			relayFormat = types.RelayFormatOpenAIImage
-		case constant.EndpointTypeEmbeddings:
-			relayFormat = types.RelayFormatEmbedding
-		default:
-			relayFormat = types.RelayFormatOpenAI
-		}
-	} else {
-		// 根据请求路径自动检测
-		relayFormat = types.RelayFormatOpenAI
-		if c.Request.URL.Path == "/v1/embeddings" {
-			relayFormat = types.RelayFormatEmbedding
-		}
-		if c.Request.URL.Path == "/v1/images/generations" {
-			relayFormat = types.RelayFormatOpenAIImage
-		}
-		if c.Request.URL.Path == "/v1/messages" {
-			relayFormat = types.RelayFormatClaude
-		}
-		if strings.Contains(c.Request.URL.Path, "/v1beta/models") {
-			relayFormat = types.RelayFormatGemini
-		}
-		if c.Request.URL.Path == "/v1/rerank" || c.Request.URL.Path == "/rerank" {
-			relayFormat = types.RelayFormatRerank
-		}
-		if c.Request.URL.Path == "/v1/responses" {
-			relayFormat = types.RelayFormatOpenAIResponses
-		}
-		if strings.HasPrefix(c.Request.URL.Path, "/v1/responses/compact") {
-			relayFormat = types.RelayFormatOpenAIResponsesCompaction
-		}
-	}
+	relayFormat := resolveChannelTestRelayFormat(endpointType, c.Request.URL.Path)
 
 	request := buildTestRequest(testModel, endpointType, channel, isStream)
 
@@ -724,7 +725,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Documents: []any{"Deep Learning is a subset of machine learning.", "Machine learning is a field of artificial intelligence."},
 				TopN:      lo.ToPtr(2),
 			}
-		case constant.EndpointTypeOpenAIResponse:
+		case constant.EndpointTypeOpenAIResponse, constant.EndpointTypeOpenAIResponseViaChat:
 			// 返回 OpenAIResponsesRequest
 			return &dto.OpenAIResponsesRequest{
 				Model:  model,

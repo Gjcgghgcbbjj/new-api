@@ -3677,6 +3677,9 @@
     "并确认自行承担部署": "並確認自行承擔部署",
     "运营和收费行为产生的法律责任": "營運和收費行為產生的法律責任",
     "，": "，",
-    "、": "、"
+    "、": "、",
+    "OpenAI Chat Completions": "OpenAI 聊天補全",
+    "OpenAI Responses": "OpenAI 回應",
+    "OpenAI Responses via Chat (/v1/responses)": "透過 Chat 的 OpenAI 回應（/v1/responses）"
   }
 }

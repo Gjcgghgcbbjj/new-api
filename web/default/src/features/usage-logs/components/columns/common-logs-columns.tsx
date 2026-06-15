@@ -92,6 +92,27 @@ function getGroupRatioText(other: LogOtherData | null): string | null {
   return null
 }
 
+function formatRequestConversionChain(
+  conversionChain: string[],
+  upstreamPath: string,
+  t: (key: string, opts?: Record<string, unknown>) => string
+): string {
+  if (conversionChain.length <= 1) return t('Native format')
+  const normalizedUpstreamPath = upstreamPath.split('?')[0]
+  return conversionChain
+    .map((item) => {
+      if (
+        item === 'OpenAI Compatible' &&
+        normalizedUpstreamPath === '/v1/chat/completions'
+      ) {
+        return t('OpenAI Chat Completions')
+      }
+      if (item === 'OpenAI Responses') return t('OpenAI Responses')
+      return item
+    })
+    .join(' -> ')
+}
+
 function getEntryInterfaceDisplay(
   other: LogOtherData | null,
   t: (key: string, opts?: Record<string, unknown>) => string
@@ -108,8 +129,11 @@ function getEntryInterfaceDisplay(
     return null
   }
 
-  const conversionText =
-    conversionChain.length > 1 ? conversionChain.join(' -> ') : t('Native format')
+  const conversionText = formatRequestConversionChain(
+    conversionChain,
+    upstreamPath,
+    t
+  )
   const tooltipParts = [
     `${t('Entry Interface')}: ${requestPath}`,
     `${t('Upstream Interface')}: ${upstreamPath}`,

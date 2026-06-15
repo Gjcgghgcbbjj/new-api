@@ -368,14 +368,28 @@ export const useLogsData = () => {
 
   // Format logs data
   const setLogsFormat = (logs) => {
-    const requestConversionDisplayValue = (conversionChain) => {
+    const requestConversionDisplayValue = (conversionChain, upstreamPath = '') => {
       const chain = Array.isArray(conversionChain)
         ? conversionChain.filter(Boolean)
         : [];
       if (chain.length <= 1) {
         return t('原生格式');
       }
-      return `${chain.join(' -> ')}`;
+      const normalizedUpstreamPath = upstreamPath.split('?')[0];
+      return chain
+        .map((item) => {
+          if (
+            item === 'OpenAI Compatible' &&
+            normalizedUpstreamPath === '/v1/chat/completions'
+          ) {
+            return t('OpenAI Chat Completions');
+          }
+          if (item === 'OpenAI Responses') {
+            return t('OpenAI Responses');
+          }
+          return item;
+        })
+        .join(' -> ');
     };
 
     let expandDatesLocal = {};
@@ -541,6 +555,7 @@ export const useLogsData = () => {
         const upstreamPath = other?.upstream_request_path || requestPath;
         const conversionText = requestConversionDisplayValue(
           other?.request_conversion,
+          upstreamPath,
         );
         const processLines = [
           `${t('入口接口')}：${requestPath}`,
@@ -665,7 +680,10 @@ export const useLogsData = () => {
       ) {
         expandDataLocal.push({
           key: t('请求转换'),
-          value: requestConversionDisplayValue(other?.request_conversion),
+          value: requestConversionDisplayValue(
+            other?.request_conversion,
+            other?.upstream_request_path || other?.request_path || '',
+          ),
         });
       }
       if (isAdminUser && logs[i].type !== 6 && logs[i].type !== 1) {

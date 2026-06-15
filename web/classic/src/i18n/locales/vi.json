@@ -4213,6 +4213,12 @@
     "并确认自行承担部署": "confirm that I bear legal responsibility arising from deployment",
     "运营和收费行为产生的法律责任": "operation and charging behavior",
     "，": ", ",
-    "、": ", "
+    "、": ", ",
+    "OpenAI Chat Completions": "Hoàn tất trò chuyện OpenAI",
+    "OpenAI Responses": "Phản hồi OpenAI",
+    "OpenAI Responses via Chat (/v1/responses)": "Phản hồi OpenAI qua Chat (/v1/responses)",
+    "入口接口": "Giao diện đầu vào",
+    "上游接口": "Giao diện upstream",
+    "转换过程": "Quy trình chuyển đổi"
   }
 }

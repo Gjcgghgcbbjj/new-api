@@ -107,12 +107,7 @@ func shouldResponsesUseChatCompletionsBridge(info *relaycommon.RelayInfo, reques
 }
 
 func isResponsesViaChatBridgeCapableChannel(channelType int) bool {
-	switch channelType {
-	case constant.ChannelTypeOpenAI, constant.ChannelTypeOpenRouter, constant.ChannelTypeXinference:
-		return true
-	default:
-		return false
-	}
+	return common.IsResponsesViaChatBridgeCapableChannel(channelType)
 }
 
 func supportsNativeResponses(info *relaycommon.RelayInfo, requestModel string) bool {
